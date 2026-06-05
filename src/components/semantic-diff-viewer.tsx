@@ -26,7 +26,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { getFileDiff, getSemanticDiff } from "@/app/actions";
 import { EntityIcon } from "@/components/entity-icons";
@@ -188,39 +188,75 @@ function SummaryStat({
   );
 }
 
+function shouldIgnoreNavigationKey(event: KeyboardEvent) {
+  if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
+    return true;
+  }
+
+  const target = event.target;
+
+  return (
+    target instanceof HTMLElement &&
+    (target.isContentEditable ||
+      ["INPUT", "SELECT", "TEXTAREA"].includes(target.tagName))
+  );
+}
+
+function useHunkNavigation(
+  hunks: FileDiffMetadata["hunks"],
+  diffRootRef: React.RefObject<HTMLDivElement | null>,
+) {
+  const [currentHunk, setCurrentHunk] = useState(0);
+
+  const jumpToHunk = useCallback(
+    (index: number) => {
+      const hunk = hunks[index];
+      const diffContainer =
+        diffRootRef.current?.querySelector<HTMLElement>("diffs-container");
+      const shadowRoot = diffContainer?.shadowRoot;
+
+      if (!hunk || !shadowRoot) return;
+
+      const lineNumber =
+        hunk.additionStart > 0 ? hunk.additionStart : hunk.deletionStart;
+      const line =
+        shadowRoot.querySelector<HTMLElement>(
+          `[data-line="${lineNumber}"]`,
+        ) ??
+        shadowRoot.querySelector<HTMLElement>(
+          `[data-column-number="${lineNumber}"]`,
+        );
+
+      if (!line) return;
+
+      line.scrollIntoView({ behavior: "smooth", block: "start" });
+      setCurrentHunk(index);
+    },
+    [diffRootRef, hunks],
+  );
+
+  return {
+    currentHunk,
+    hasPreviousHunk: currentHunk > 0,
+    hasNextHunk: currentHunk < hunks.length - 1,
+    jumpToHunk,
+  };
+}
+
 function HunkNavigation({
   hunks,
-  diffRootRef,
+  currentHunk,
+  hasPreviousHunk,
+  hasNextHunk,
+  jumpToHunk,
 }: {
   hunks: FileDiffMetadata["hunks"];
-  diffRootRef: React.RefObject<HTMLDivElement | null>;
+  currentHunk: number;
+  hasPreviousHunk: boolean;
+  hasNextHunk: boolean;
+  jumpToHunk: (index: number) => void;
 }) {
-  const [currentHunk, setCurrentHunk] = useState(0);
   const hasMultipleHunks = hunks.length > 1;
-
-  function jumpToHunk(index: number) {
-    const hunk = hunks[index];
-    const diffContainer =
-      diffRootRef.current?.querySelector<HTMLElement>("diffs-container");
-    const shadowRoot = diffContainer?.shadowRoot;
-
-    if (!hunk || !shadowRoot) return;
-
-    const lineNumber =
-      hunk.additionStart > 0 ? hunk.additionStart : hunk.deletionStart;
-    const line =
-      shadowRoot.querySelector<HTMLElement>(
-        `[data-line="${lineNumber}"]`,
-      ) ??
-      shadowRoot.querySelector<HTMLElement>(
-        `[data-column-number="${lineNumber}"]`,
-      );
-
-    if (!line) return;
-
-    line.scrollIntoView({ behavior: "smooth", block: "start" });
-    setCurrentHunk(index);
-  }
 
   return (
     <div className="flex shrink-0 items-center gap-1">
@@ -235,7 +271,7 @@ function HunkNavigation({
             size="icon-sm"
             variant="ghost"
             aria-label="Previous hunk"
-            disabled={!hasMultipleHunks || currentHunk === 0}
+            disabled={!hasPreviousHunk}
             onClick={() => jumpToHunk(currentHunk - 1)}
           >
             <ArrowUp />
@@ -249,9 +285,7 @@ function HunkNavigation({
             size="icon-sm"
             variant="ghost"
             aria-label="Next hunk"
-            disabled={
-              !hasMultipleHunks || currentHunk === hunks.length - 1
-            }
+            disabled={!hasNextHunk}
             onClick={() => jumpToHunk(currentHunk + 1)}
           >
             <ArrowDown />
@@ -373,10 +407,14 @@ function EntityDiff({
   change,
   theme,
   renderVersion,
+  onPreviousEntity,
+  onNextEntity,
 }: {
   change: SemanticChange;
   theme: "light" | "dark";
   renderVersion: string;
+  onPreviousEntity?: () => void;
+  onNextEntity?: () => void;
 }) {
   const status = changeStyles[change.changeType];
   const fileDiff = useMemo(
@@ -384,6 +422,54 @@ function EntityDiff({
     [change, renderVersion],
   );
   const diffRootRef = useRef<HTMLDivElement>(null);
+  const hunkNavigation = useHunkNavigation(
+    fileDiff.hunks,
+    diffRootRef,
+  );
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (shouldIgnoreNavigationKey(event)) return;
+
+      if (
+        (event.key === "ArrowLeft" || event.key === "h") &&
+        onPreviousEntity
+      ) {
+        event.preventDefault();
+        onPreviousEntity();
+        return;
+      }
+
+      if (
+        (event.key === "ArrowRight" || event.key === "l") &&
+        onNextEntity
+      ) {
+        event.preventDefault();
+        onNextEntity();
+        return;
+      }
+
+      if (
+        (event.key === "ArrowUp" || event.key === "k") &&
+        hunkNavigation.hasPreviousHunk
+      ) {
+        event.preventDefault();
+        hunkNavigation.jumpToHunk(hunkNavigation.currentHunk - 1);
+        return;
+      }
+
+      if (
+        (event.key === "ArrowDown" || event.key === "j") &&
+        hunkNavigation.hasNextHunk
+      ) {
+        event.preventDefault();
+        hunkNavigation.jumpToHunk(hunkNavigation.currentHunk + 1);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [hunkNavigation, onNextEntity, onPreviousEntity]);
 
   return (
     <main className="flex h-full min-w-0 flex-col bg-background">
@@ -432,9 +518,8 @@ function EntityDiff({
             </span>
           ) : null}
           <HunkNavigation
-            key={`${change.entityId}:${renderVersion}`}
             hunks={fileDiff.hunks}
-            diffRootRef={diffRootRef}
+            {...hunkNavigation}
           />
         </div>
       </div>
@@ -476,6 +561,33 @@ function FileDiffView({
 }) {
   const fileDiff = useMemo(() => getSingularPatch(patch), [patch]);
   const diffRootRef = useRef<HTMLDivElement>(null);
+  const hunkNavigation = useHunkNavigation(fileDiff.hunks, diffRootRef);
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (shouldIgnoreNavigationKey(event)) return;
+
+      if (
+        (event.key === "ArrowUp" || event.key === "k") &&
+        hunkNavigation.hasPreviousHunk
+      ) {
+        event.preventDefault();
+        hunkNavigation.jumpToHunk(hunkNavigation.currentHunk - 1);
+        return;
+      }
+
+      if (
+        (event.key === "ArrowDown" || event.key === "j") &&
+        hunkNavigation.hasNextHunk
+      ) {
+        event.preventDefault();
+        hunkNavigation.jumpToHunk(hunkNavigation.currentHunk + 1);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [hunkNavigation]);
 
   return (
     <main className="flex h-full min-w-0 flex-col bg-background">
@@ -498,9 +610,8 @@ function FileDiffView({
           </p>
         </div>
         <HunkNavigation
-          key={patch}
           hunks={fileDiff.hunks}
-          diffRootRef={diffRootRef}
+          {...hunkNavigation}
         />
       </div>
 
@@ -620,12 +731,22 @@ export function SemanticDiffViewer() {
         : [],
     [diff, mergeModuleChanges],
   );
+  const navigableChanges = useMemo(
+    () => groupByFile(visibleChanges).flatMap((group) => group.changes),
+    [visibleChanges],
+  );
   const selectedChange =
     selectedFilePath === undefined
-      ? (visibleChanges.find((change) => change.entityId === selectedFromUrl) ??
-        visibleChanges[0])
+      ? (navigableChanges.find(
+          (change) => change.entityId === selectedFromUrl,
+        ) ?? navigableChanges[0])
       : undefined;
   const selectedEntityId = selectedChange?.entityId;
+  const selectedEntityIndex = selectedChange
+    ? navigableChanges.findIndex(
+        (change) => change.entityId === selectedChange.entityId,
+      )
+    : -1;
   const fileQuery = useQuery({
     queryKey: ["file-diff", "unstaged", selectedFilePath],
     queryFn: () => getFileDiff(selectedFilePath!),
@@ -830,6 +951,7 @@ export function SemanticDiffViewer() {
                 ) : null}
                 {selectedFilePath && fileQuery.data?.ok ? (
                   <FileDiffView
+                    key={`${fileQuery.data.data.filePath}:${fileQuery.data.data.patch}`}
                     filePath={fileQuery.data.data.filePath}
                     patch={fileQuery.data.data.patch}
                     theme={theme}
@@ -837,9 +959,28 @@ export function SemanticDiffViewer() {
                 ) : null}
                 {!selectedFilePath && selectedChange ? (
                   <EntityDiff
+                    key={`${selectedChange.entityId}:${diff.refreshedAt}`}
                     change={selectedChange}
                     theme={theme}
                     renderVersion={diff.refreshedAt}
+                    onPreviousEntity={
+                      selectedEntityIndex > 0
+                        ? () =>
+                            selectEntity(
+                              navigableChanges[selectedEntityIndex - 1]
+                                .entityId,
+                            )
+                        : undefined
+                    }
+                    onNextEntity={
+                      selectedEntityIndex < navigableChanges.length - 1
+                        ? () =>
+                            selectEntity(
+                              navigableChanges[selectedEntityIndex + 1]
+                                .entityId,
+                            )
+                        : undefined
+                    }
                   />
                 ) : null}
               </ResizablePanel>
