@@ -106,17 +106,20 @@ function groupByFile(changes: SemanticChange[]) {
     }));
 }
 
-function createEntityFileDiff(change: SemanticChange): FileDiffMetadata {
+function createEntityFileDiff(
+  change: SemanticChange,
+  renderVersion: string,
+): FileDiffMetadata {
   const oldName = change.oldFilePath || change.filePath;
   const oldFile = {
     name: oldName,
     contents: change.beforeContent ?? "",
-    cacheKey: `${change.entityId}:before`,
+    cacheKey: `${change.entityId}:${renderVersion}:before`,
   };
   const newFile = {
     name: change.filePath,
     contents: change.afterContent ?? "",
-    cacheKey: `${change.entityId}:after`,
+    cacheKey: `${change.entityId}:${renderVersion}:after`,
   };
   const fileDiff = parseDiffFromFile(oldFile, newFile, {
     context: Number.POSITIVE_INFINITY,
@@ -288,12 +291,17 @@ function Sidebar({
 function EntityDiff({
   change,
   theme,
+  renderVersion,
 }: {
   change: SemanticChange;
   theme: "light" | "dark";
+  renderVersion: string;
 }) {
   const status = changeStyles[change.changeType];
-  const fileDiff = useMemo(() => createEntityFileDiff(change), [change]);
+  const fileDiff = useMemo(
+    () => createEntityFileDiff(change, renderVersion),
+    [change, renderVersion],
+  );
 
   return (
     <main className="flex h-full min-w-0 flex-col bg-background">
@@ -526,10 +534,11 @@ export function SemanticDiffViewer() {
       : undefined;
   const selectedEntityId = selectedChange?.entityId;
   const fileQuery = useQuery({
-    queryKey: ["file-diff", "unstaged", selectedFilePath, diff?.refreshedAt],
+    queryKey: ["file-diff", "unstaged", selectedFilePath],
     queryFn: () => getFileDiff(selectedFilePath!),
     enabled: selectedFilePath !== undefined && diff !== undefined,
   });
+  const isRefreshing = query.isFetching || fileQuery.isFetching;
 
   function replaceSearchParams(params: URLSearchParams) {
     const queryString = params.toString();
@@ -565,6 +574,27 @@ export function SemanticDiffViewer() {
     }
 
     replaceSearchParams(params);
+  }
+
+  async function refreshDiff() {
+    const refreshed = await query.refetch();
+
+    if (selectedFilePath) {
+      if (
+        refreshed.data?.ok &&
+        !refreshed.data.data.changes.some(
+          (change) => change.filePath === selectedFilePath,
+        )
+      ) {
+        const params = new URLSearchParams(searchParams.toString());
+        params.delete("file");
+        replaceSearchParams(params);
+        return;
+      }
+
+      if (!refreshed.data?.ok) return;
+      await fileQuery.refetch();
+    }
   }
 
   return (
@@ -657,15 +687,10 @@ export function SemanticDiffViewer() {
                   size="icon"
                   variant="outline"
                   aria-label="Refresh semantic diff"
-                  onClick={() => {
-                    query.refetch();
-                    if (selectedFilePath) fileQuery.refetch();
-                  }}
-                  disabled={query.isFetching}
+                  onClick={refreshDiff}
+                  disabled={isRefreshing}
                 >
-                  <RefreshCw
-                    className={cn(query.isFetching && "animate-spin")}
-                  />
+                  <RefreshCw className={cn(isRefreshing && "animate-spin")} />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Rerun sem diff</TooltipContent>
@@ -718,7 +743,11 @@ export function SemanticDiffViewer() {
                   />
                 ) : null}
                 {!selectedFilePath && selectedChange ? (
-                  <EntityDiff change={selectedChange} theme={theme} />
+                  <EntityDiff
+                    change={selectedChange}
+                    theme={theme}
+                    renderVersion={diff.refreshedAt}
+                  />
                 ) : null}
               </ResizablePanel>
             </ResizablePanelGroup>
