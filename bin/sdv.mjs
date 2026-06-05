@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { spawn, spawnSync } from "node:child_process";
+import { constants as osConstants } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -58,6 +59,7 @@ const server = spawn(
   ],
   {
     cwd: repositoryDirectory,
+    detached: true,
     env: {
       ...process.env,
       SDV_REPO_CWD: repositoryDirectory,
@@ -66,16 +68,59 @@ const server = spawn(
   },
 );
 
+let shutdownSignal;
+let shutdownTimer;
+
+function getSignalExitCode(signal) {
+  return 128 + (osConstants.signals[signal] ?? 0);
+}
+
+function killServer(signal) {
+  if (!server.pid || server.exitCode !== null || server.signalCode !== null) {
+    return;
+  }
+
+  try {
+    process.kill(-server.pid, signal);
+  } catch (error) {
+    if (error?.code !== "ESRCH") {
+      console.error(`sdv: failed to stop server: ${error.message}`);
+    }
+  }
+}
+
+function shutdown(signal) {
+  if (shutdownSignal) {
+    killServer("SIGKILL");
+    process.exit(getSignalExitCode(signal));
+  }
+
+  shutdownSignal = signal;
+  killServer(signal);
+
+  shutdownTimer = setTimeout(() => {
+    console.error("sdv: server did not stop in time; forcing shutdown");
+    killServer("SIGKILL");
+    process.exit(getSignalExitCode(signal));
+  }, 2_000);
+  shutdownTimer.unref();
+}
+
 server.on("error", (error) => {
   console.error(`sdv: failed to start server: ${error.message}`);
   process.exit(1);
 });
 
 for (const signal of ["SIGINT", "SIGTERM"]) {
-  process.on(signal, () => server.kill(signal));
+  process.on(signal, () => shutdown(signal));
 }
 
 server.on("exit", (code, signal) => {
-  if (signal) process.kill(process.pid, signal);
-  process.exit(code ?? 1);
+  if (shutdownTimer) clearTimeout(shutdownTimer);
+
+  if (shutdownSignal) {
+    process.exit(getSignalExitCode(shutdownSignal));
+  }
+
+  process.exit(code ?? (signal ? getSignalExitCode(signal) : 1));
 });
