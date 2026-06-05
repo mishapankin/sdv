@@ -11,6 +11,7 @@ import {
   FileCode2,
   GitBranch,
   GitCompareArrows,
+  GitMerge,
   LoaderCircle,
   Minus,
   RefreshCw,
@@ -18,7 +19,7 @@ import {
   SearchX,
   Sparkles,
 } from "lucide-react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useMemo } from "react";
 
 import { getSemanticDiff } from "@/app/actions";
@@ -40,8 +41,8 @@ import {
 import type {
   ChangeType,
   SemanticChange,
-  SemDiff,
 } from "@/lib/sem-types";
+import { mergeModuleLevelChanges } from "@/lib/merge-module-changes";
 import { cn } from "@/lib/utils";
 
 const changeStyles: Record<
@@ -175,15 +176,15 @@ function SummaryStat({
 }
 
 function Sidebar({
-  diff,
+  changes,
   selectedId,
   onSelect,
 }: {
-  diff: SemDiff;
+  changes: SemanticChange[];
   selectedId?: string;
   onSelect: (entityId: string) => void;
 }) {
-  const fileGroups = useMemo(() => groupByFile(diff.changes), [diff.changes]);
+  const fileGroups = useMemo(() => groupByFile(changes), [changes]);
 
   return (
     <aside className="flex h-full min-w-0 flex-col bg-sidebar">
@@ -200,7 +201,7 @@ function Sidebar({
           </Badge>
         </div>
         <span className="font-mono text-[11px] text-muted-foreground">
-          {diff.summary.total} entities
+          {changes.length} entities
         </span>
       </div>
 
@@ -416,24 +417,56 @@ function LoadingState() {
 }
 
 export function SemanticDiffViewer() {
-  const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const selectedFromUrl = searchParams.get("entity") ?? undefined;
+  const mergeModuleChanges = searchParams.get("merge-module") !== "off";
   const query = useQuery({
     queryKey: ["semantic-diff", "unstaged"],
     queryFn: getSemanticDiff,
   });
   const result = query.data;
   const diff = result?.ok ? result.data : undefined;
+  const visibleChanges = useMemo(
+    () =>
+      diff
+        ? mergeModuleChanges
+          ? mergeModuleLevelChanges(diff.changes)
+          : diff.changes
+        : [],
+    [diff, mergeModuleChanges],
+  );
   const selectedChange =
-    diff?.changes.find((change) => change.entityId === selectedFromUrl) ??
-    diff?.changes[0];
+    visibleChanges.find((change) => change.entityId === selectedFromUrl) ??
+    visibleChanges[0];
   const selectedId = selectedChange?.entityId;
+
+  function replaceSearchParams(params: URLSearchParams) {
+    const queryString = params.toString();
+    window.history.replaceState(
+      null,
+      "",
+      queryString ? `${pathname}?${queryString}` : pathname,
+    );
+  }
 
   function selectEntity(entityId: string) {
     const params = new URLSearchParams(searchParams.toString());
     params.set("entity", entityId);
-    router.replace(`?${params.toString()}`, { scroll: false });
+    replaceSearchParams(params);
+  }
+
+  function toggleModuleMerge() {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("entity");
+
+    if (mergeModuleChanges) {
+      params.set("merge-module", "off");
+    } else {
+      params.delete("merge-module");
+    }
+
+    replaceSearchParams(params);
   }
 
   return (
@@ -469,16 +502,28 @@ export function SemanticDiffViewer() {
               <div className="hidden items-center gap-3 md:flex">
                 <SummaryStat
                   label="added"
-                  value={diff.summary.added}
+                  value={
+                    visibleChanges.filter(
+                      (change) => change.changeType === "added",
+                    ).length
+                  }
                   tone="positive"
                 />
                 <SummaryStat
                   label="modified"
-                  value={diff.summary.modified}
+                  value={
+                    visibleChanges.filter(
+                      (change) => change.changeType === "modified",
+                    ).length
+                  }
                 />
                 <SummaryStat
                   label="deleted"
-                  value={diff.summary.deleted}
+                  value={
+                    visibleChanges.filter(
+                      (change) => change.changeType === "deleted",
+                    ).length
+                  }
                   tone="negative"
                 />
               </div>
@@ -489,6 +534,25 @@ export function SemanticDiffViewer() {
             >
               Unstaged
             </Badge>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="sm"
+                  variant={mergeModuleChanges ? "secondary" : "outline"}
+                  aria-pressed={mergeModuleChanges}
+                  onClick={toggleModuleMerge}
+                  className="hidden sm:inline-flex"
+                >
+                  <GitMerge />
+                  Module merge: {mergeModuleChanges ? "on" : "off"}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {mergeModuleChanges
+                  ? "Show module-level additions and deletions separately"
+                  : "Merge matching module-level additions and deletions"}
+              </TooltipContent>
+            </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -517,8 +581,8 @@ export function SemanticDiffViewer() {
               isFetching={query.isFetching}
             />
           ) : null}
-          {diff && diff.changes.length === 0 ? <EmptyState /> : null}
-          {diff && diff.changes.length > 0 && selectedChange ? (
+          {diff && visibleChanges.length === 0 ? <EmptyState /> : null}
+          {diff && visibleChanges.length > 0 && selectedChange ? (
             <ResizablePanelGroup orientation="horizontal">
               <ResizablePanel
                 defaultSize="27%"
@@ -526,7 +590,7 @@ export function SemanticDiffViewer() {
                 maxSize="42%"
               >
                 <Sidebar
-                  diff={diff}
+                  changes={visibleChanges}
                   selectedId={selectedId}
                   onSelect={selectEntity}
                 />
