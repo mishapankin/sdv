@@ -24,6 +24,7 @@ import { useMemo } from "react";
 
 import { getFileDiff, getSemanticDiff } from "@/app/actions";
 import { EntityIcon } from "@/components/entity-icons";
+import { ThemeToggle, useTheme } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,10 +39,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import type {
-  ChangeType,
-  SemanticChange,
-} from "@/lib/sem-types";
+import type { ChangeType, SemanticChange } from "@/lib/sem-types";
 import { mergeModuleLevelChanges } from "@/lib/merge-module-changes";
 import { cn } from "@/lib/utils";
 
@@ -52,32 +50,38 @@ const changeStyles: Record<
   added: {
     label: "Added",
     shortLabel: "A",
-    className: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    className:
+      "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
   },
   modified: {
     label: "Modified",
     shortLabel: "M",
-    className: "border-amber-200 bg-amber-50 text-amber-700",
+    className:
+      "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300",
   },
   deleted: {
     label: "Deleted",
     shortLabel: "D",
-    className: "border-rose-200 bg-rose-50 text-rose-700",
+    className:
+      "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-300",
   },
   moved: {
     label: "Moved",
     shortLabel: "V",
-    className: "border-blue-200 bg-blue-50 text-blue-700",
+    className:
+      "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300",
   },
   renamed: {
     label: "Renamed",
     shortLabel: "R",
-    className: "border-violet-200 bg-violet-50 text-violet-700",
+    className:
+      "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950 dark:text-violet-300",
   },
   reordered: {
     label: "Reordered",
     shortLabel: "O",
-    className: "border-cyan-200 bg-cyan-50 text-cyan-700",
+    className:
+      "border-cyan-200 bg-cyan-50 text-cyan-700 dark:border-cyan-800 dark:bg-cyan-950 dark:text-cyan-300",
   },
 };
 
@@ -212,20 +216,16 @@ function Sidebar({
       <ScrollArea className="min-h-0 flex-1">
         <nav aria-label="Changed semantic entities" className="py-2">
           {fileGroups.map((group) => (
-            <details
-              key={group.filePath}
-              open
-              className="group/file mb-1"
-            >
+            <details key={group.filePath} open className="group/file mb-1">
               <summary
                 className={cn(
                   "flex h-9 cursor-pointer list-none items-center gap-2 px-3 text-xs font-medium transition-colors select-none hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden",
                   selectedFilePath === group.filePath &&
-                    "bg-white text-foreground shadow-xs",
+                    "bg-card text-foreground shadow-xs",
                 )}
               >
                 <ChevronDown className="size-3.5 shrink-0 -rotate-90 text-muted-foreground transition-transform group-open/file:rotate-0" />
-                <FileCode2 className="size-3.5 shrink-0 text-slate-500" />
+                <FileCode2 className="size-3.5 shrink-0 text-muted-foreground" />
                 <button
                   type="button"
                   className="min-w-0 flex-1 truncate text-left hover:underline hover:underline-offset-2 focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
@@ -251,7 +251,7 @@ function Sidebar({
                     className={cn(
                       "group flex w-full items-center gap-2 rounded-md border border-transparent px-2 py-2 text-left transition-colors",
                       selectedEntityId === change.entityId
-                        ? "border-slate-200 bg-white shadow-xs"
+                        ? "border-border bg-card shadow-xs"
                         : "hover:bg-sidebar-accent",
                     )}
                   >
@@ -260,8 +260,8 @@ function Sidebar({
                       className={cn(
                         "size-4 shrink-0",
                         selectedEntityId === change.entityId
-                          ? "text-slate-800"
-                          : "text-slate-500",
+                          ? "text-foreground"
+                          : "text-muted-foreground",
                       )}
                     />
                     <span className="min-w-0 flex-1">
@@ -285,18 +285,24 @@ function Sidebar({
   );
 }
 
-function EntityDiff({ change }: { change: SemanticChange }) {
+function EntityDiff({
+  change,
+  theme,
+}: {
+  change: SemanticChange;
+  theme: "light" | "dark";
+}) {
   const status = changeStyles[change.changeType];
   const fileDiff = useMemo(() => createEntityFileDiff(change), [change]);
 
   return (
-    <main className="flex h-full min-w-0 flex-col bg-[#f8f9fb]">
-      <div className="flex min-h-20 shrink-0 items-center justify-between gap-4 border-b bg-white px-6 py-3">
+    <main className="flex h-full min-w-0 flex-col bg-background">
+      <div className="flex min-h-20 shrink-0 items-center justify-between gap-4 border-b bg-card px-6 py-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2.5">
             <EntityIcon
               entityType={change.entityType}
-              className="size-5 text-slate-700"
+              className="size-5 text-foreground"
             />
             <h1 className="truncate text-lg font-semibold tracking-tight">
               {change.entityName || "(anonymous)"}
@@ -347,14 +353,14 @@ function EntityDiff({ change }: { change: SemanticChange }) {
 
       <ScrollArea className="min-h-0 flex-1">
         <div className="min-w-[720px] p-5">
-          <div className="overflow-hidden rounded-lg border bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+          <div className="overflow-hidden rounded-lg border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
             <FileDiff
               fileDiff={fileDiff}
               options={{
                 diffStyle: "split",
                 diffIndicators: "bars",
                 lineDiffType: "word-alt",
-                theme: "pierre-light",
+                theme: theme === "dark" ? "pierre-dark" : "pierre-light",
                 overflow: "scroll",
                 disableFileHeader: true,
                 expandUnchanged: true,
@@ -372,16 +378,18 @@ function EntityDiff({ change }: { change: SemanticChange }) {
 function FileDiffView({
   filePath,
   patch,
+  theme,
 }: {
   filePath: string;
   patch: string;
+  theme: "light" | "dark";
 }) {
   return (
-    <main className="flex h-full min-w-0 flex-col bg-[#f8f9fb]">
-      <div className="flex min-h-20 shrink-0 items-center border-b bg-white px-6 py-3">
+    <main className="flex h-full min-w-0 flex-col bg-background">
+      <div className="flex min-h-20 shrink-0 items-center border-b bg-card px-6 py-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2.5">
-            <FileCode2 className="size-5 text-slate-700" />
+            <FileCode2 className="size-5 text-foreground" />
             <h1 className="truncate text-lg font-semibold tracking-tight">
               {filePath}
             </h1>
@@ -400,14 +408,14 @@ function FileDiffView({
 
       <ScrollArea className="min-h-0 flex-1">
         <div className="min-w-[720px] p-5">
-          <div className="overflow-hidden rounded-lg border bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+          <div className="overflow-hidden rounded-lg border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
             <PatchDiff
               patch={patch}
               options={{
                 diffStyle: "split",
                 diffIndicators: "bars",
                 lineDiffType: "word-alt",
-                theme: "pierre-light",
+                theme: theme === "dark" ? "pierre-dark" : "pierre-light",
                 overflow: "scroll",
                 disableFileHeader: true,
               }}
@@ -423,10 +431,10 @@ function FileDiffView({
 
 function EmptyState() {
   return (
-    <div className="flex h-full items-center justify-center bg-[#f8f9fb] p-8">
+    <div className="flex h-full items-center justify-center bg-background p-8">
       <div className="max-w-sm text-center">
-        <div className="mx-auto flex size-12 items-center justify-center rounded-xl border bg-white shadow-sm">
-          <SearchX className="size-5 text-slate-500" />
+        <div className="mx-auto flex size-12 items-center justify-center rounded-xl border bg-card shadow-sm">
+          <SearchX className="size-5 text-muted-foreground" />
         </div>
         <h2 className="mt-4 text-base font-semibold">Working tree is clean</h2>
         <p className="mt-1.5 text-sm leading-6 text-muted-foreground">
@@ -450,10 +458,10 @@ function ErrorState({
   title?: string;
 }) {
   return (
-    <div className="flex h-full items-center justify-center bg-[#f8f9fb] p-8">
-      <div className="w-full max-w-lg rounded-xl border border-rose-200 bg-white p-5 shadow-sm">
+    <div className="flex h-full items-center justify-center bg-background p-8">
+      <div className="w-full max-w-lg rounded-xl border border-rose-200 bg-card p-5 shadow-sm dark:border-rose-900">
         <div className="flex items-start gap-3">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-rose-50 text-rose-700">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300">
             <AlertTriangle className="size-4" />
           </div>
           <div className="min-w-0 flex-1">
@@ -480,7 +488,7 @@ function ErrorState({
 
 function LoadingState() {
   return (
-    <div className="flex h-full items-center justify-center bg-[#f8f9fb]">
+    <div className="flex h-full items-center justify-center bg-background">
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <LoaderCircle className="size-4 animate-spin" />
         Running sem diff
@@ -490,6 +498,7 @@ function LoadingState() {
 }
 
 export function SemanticDiffViewer() {
+  const theme = useTheme();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const selectedFromUrl = searchParams.get("entity") ?? undefined;
@@ -512,18 +521,12 @@ export function SemanticDiffViewer() {
   );
   const selectedChange =
     selectedFilePath === undefined
-      ? (visibleChanges.find(
-          (change) => change.entityId === selectedFromUrl,
-        ) ?? visibleChanges[0])
+      ? (visibleChanges.find((change) => change.entityId === selectedFromUrl) ??
+        visibleChanges[0])
       : undefined;
   const selectedEntityId = selectedChange?.entityId;
   const fileQuery = useQuery({
-    queryKey: [
-      "file-diff",
-      "unstaged",
-      selectedFilePath,
-      diff?.refreshedAt,
-    ],
+    queryKey: ["file-diff", "unstaged", selectedFilePath, diff?.refreshedAt],
     queryFn: () => getFileDiff(selectedFilePath!),
     enabled: selectedFilePath !== undefined && diff !== undefined,
   });
@@ -567,7 +570,7 @@ export function SemanticDiffViewer() {
   return (
     <TooltipProvider>
       <div className="flex h-dvh min-h-[520px] flex-col overflow-hidden bg-background">
-        <header className="flex h-14 shrink-0 items-center justify-between border-b bg-white px-4">
+        <header className="flex h-14 shrink-0 items-center justify-between border-b bg-card px-4">
           <div className="flex min-w-0 items-center gap-4">
             <div className="flex items-center gap-2">
               <div className="flex size-7 items-center justify-center rounded-md bg-slate-950 text-white shadow-sm">
@@ -583,7 +586,7 @@ export function SemanticDiffViewer() {
                 <span className="max-w-36 truncate font-medium text-foreground">
                   {diff.repositoryName}
                 </span>
-                <span className="text-slate-300">/</span>
+                <span className="text-muted-foreground/50">/</span>
                 <GitBranch className="size-3.5" />
                 <span className="max-w-36 truncate font-mono">
                   {diff.branchName}
@@ -667,6 +670,7 @@ export function SemanticDiffViewer() {
               </TooltipTrigger>
               <TooltipContent>Rerun sem diff</TooltipContent>
             </Tooltip>
+            <ThemeToggle />
           </div>
         </header>
 
@@ -684,11 +688,7 @@ export function SemanticDiffViewer() {
           visibleChanges.length > 0 &&
           (selectedFilePath || selectedChange) ? (
             <ResizablePanelGroup orientation="horizontal">
-              <ResizablePanel
-                defaultSize="27%"
-                minSize="220px"
-                maxSize="42%"
-              >
+              <ResizablePanel defaultSize="27%" minSize="220px" maxSize="42%">
                 <Sidebar
                   changes={visibleChanges}
                   selectedEntityId={selectedEntityId}
@@ -702,9 +702,7 @@ export function SemanticDiffViewer() {
                 {selectedFilePath && fileQuery.isPending ? (
                   <LoadingState />
                 ) : null}
-                {selectedFilePath &&
-                fileQuery.data &&
-                !fileQuery.data.ok ? (
+                {selectedFilePath && fileQuery.data && !fileQuery.data.ok ? (
                   <ErrorState
                     error={fileQuery.data.error}
                     onRetry={() => fileQuery.refetch()}
@@ -716,17 +714,18 @@ export function SemanticDiffViewer() {
                   <FileDiffView
                     filePath={fileQuery.data.data.filePath}
                     patch={fileQuery.data.data.patch}
+                    theme={theme}
                   />
                 ) : null}
                 {!selectedFilePath && selectedChange ? (
-                  <EntityDiff change={selectedChange} />
+                  <EntityDiff change={selectedChange} theme={theme} />
                 ) : null}
               </ResizablePanel>
             </ResizablePanelGroup>
           ) : null}
         </div>
 
-        <footer className="flex h-7 shrink-0 items-center justify-between border-t bg-white px-3 font-mono text-[10px] text-muted-foreground">
+        <footer className="flex h-7 shrink-0 items-center justify-between border-t bg-card px-3 font-mono text-[10px] text-muted-foreground">
           <span className="flex items-center gap-1.5">
             <CirclePlus className="size-3" />
             sem diff --verbose --format json
