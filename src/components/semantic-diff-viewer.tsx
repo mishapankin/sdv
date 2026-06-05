@@ -1,6 +1,7 @@
 "use client";
 
-import { MultiFileDiff } from "@pierre/diffs/react";
+import { parseDiffFromFile, type FileDiffMetadata } from "@pierre/diffs";
+import { FileDiff } from "@pierre/diffs/react";
 import { useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
@@ -100,6 +101,33 @@ function groupByFile(changes: SemanticChange[]) {
     }));
 }
 
+function createEntityFileDiff(change: SemanticChange): FileDiffMetadata {
+  const oldName = change.oldFilePath || change.filePath;
+  const oldFile = {
+    name: oldName,
+    contents: change.beforeContent ?? "",
+    cacheKey: `${change.entityId}:before`,
+  };
+  const newFile = {
+    name: change.filePath,
+    contents: change.afterContent ?? "",
+    cacheKey: `${change.entityId}:after`,
+  };
+  const fileDiff = parseDiffFromFile(oldFile, newFile, {
+    context: Number.POSITIVE_INFINITY,
+  });
+  const oldOffset = Math.max((change.oldStartLine ?? 1) - 1, 0);
+  const newOffset = Math.max((change.startLine ?? 1) - 1, 0);
+
+  for (const hunk of fileDiff.hunks) {
+    hunk.deletionStart += oldOffset;
+    hunk.additionStart += newOffset;
+    hunk.hunkSpecs = `@@ -${hunk.deletionStart},${hunk.deletionCount} +${hunk.additionStart},${hunk.additionCount} @@`;
+  }
+
+  return fileDiff;
+}
+
 function ChangeBadge({ changeType }: { changeType: ChangeType }) {
   const style = changeStyles[changeType];
 
@@ -179,18 +207,21 @@ function Sidebar({
       <ScrollArea className="min-h-0 flex-1">
         <nav aria-label="Changed semantic entities" className="py-2">
           {fileGroups.map((group) => (
-            <section key={group.filePath} className="mb-1">
-              <div className="flex h-9 items-center gap-2 px-3 text-xs font-medium">
-                <ChevronDown className="size-3.5 text-muted-foreground" />
-                <FileCode2 className="size-3.5 text-slate-500" />
+            <details
+              key={group.filePath}
+              open
+              className="group/file mb-1"
+            >
+              <summary className="flex h-9 cursor-pointer list-none items-center gap-2 px-3 text-xs font-medium transition-colors select-none hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+                <ChevronDown className="size-3.5 shrink-0 -rotate-90 text-muted-foreground transition-transform group-open/file:rotate-0" />
+                <FileCode2 className="size-3.5 shrink-0 text-slate-500" />
                 <span className="min-w-0 flex-1 truncate" title={group.filePath}>
                   {group.filePath}
                 </span>
                 <span className="font-mono text-[10px] text-muted-foreground">
                   {group.changes.length}
                 </span>
-              </div>
-
+              </summary>
               <div className="space-y-0.5 px-1.5">
                 {group.changes.map((change) => (
                   <button
@@ -226,7 +257,7 @@ function Sidebar({
                   </button>
                 ))}
               </div>
-            </section>
+            </details>
           ))}
         </nav>
       </ScrollArea>
@@ -235,8 +266,8 @@ function Sidebar({
 }
 
 function EntityDiff({ change }: { change: SemanticChange }) {
-  const oldName = change.oldFilePath || change.filePath;
   const status = changeStyles[change.changeType];
+  const fileDiff = useMemo(() => createEntityFileDiff(change), [change]);
 
   return (
     <main className="flex h-full min-w-0 flex-col bg-[#f8f9fb]">
@@ -297,17 +328,8 @@ function EntityDiff({ change }: { change: SemanticChange }) {
       <ScrollArea className="min-h-0 flex-1">
         <div className="min-w-[720px] p-5">
           <div className="overflow-hidden rounded-lg border bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-            <MultiFileDiff
-              oldFile={{
-                name: oldName,
-                contents: change.beforeContent ?? "",
-                cacheKey: `${change.entityId}:before`,
-              }}
-              newFile={{
-                name: change.filePath,
-                contents: change.afterContent ?? "",
-                cacheKey: `${change.entityId}:after`,
-              }}
+            <FileDiff
+              fileDiff={fileDiff}
               options={{
                 diffStyle: "split",
                 diffIndicators: "bars",
