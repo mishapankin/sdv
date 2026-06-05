@@ -1,7 +1,7 @@
 "use client";
 
 import { parseDiffFromFile, type FileDiffMetadata } from "@pierre/diffs";
-import { FileDiff } from "@pierre/diffs/react";
+import { FileDiff, PatchDiff } from "@pierre/diffs/react";
 import { useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
@@ -22,7 +22,7 @@ import {
 import { usePathname, useSearchParams } from "next/navigation";
 import { useMemo } from "react";
 
-import { getSemanticDiff } from "@/app/actions";
+import { getFileDiff, getSemanticDiff } from "@/app/actions";
 import { EntityIcon } from "@/components/entity-icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -177,12 +177,16 @@ function SummaryStat({
 
 function Sidebar({
   changes,
-  selectedId,
-  onSelect,
+  selectedEntityId,
+  selectedFilePath,
+  onSelectEntity,
+  onSelectFile,
 }: {
   changes: SemanticChange[];
-  selectedId?: string;
-  onSelect: (entityId: string) => void;
+  selectedEntityId?: string;
+  selectedFilePath?: string;
+  onSelectEntity: (entityId: string) => void;
+  onSelectFile: (filePath: string) => void;
 }) {
   const fileGroups = useMemo(() => groupByFile(changes), [changes]);
 
@@ -213,25 +217,40 @@ function Sidebar({
               open
               className="group/file mb-1"
             >
-              <summary className="flex h-9 cursor-pointer list-none items-center gap-2 px-3 text-xs font-medium transition-colors select-none hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+              <summary
+                className={cn(
+                  "flex h-9 cursor-pointer list-none items-center gap-2 px-3 text-xs font-medium transition-colors select-none hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden",
+                  selectedFilePath === group.filePath &&
+                    "bg-white text-foreground shadow-xs",
+                )}
+              >
                 <ChevronDown className="size-3.5 shrink-0 -rotate-90 text-muted-foreground transition-transform group-open/file:rotate-0" />
                 <FileCode2 className="size-3.5 shrink-0 text-slate-500" />
-                <span className="min-w-0 flex-1 truncate" title={group.filePath}>
+                <button
+                  type="button"
+                  className="min-w-0 flex-1 truncate text-left hover:underline hover:underline-offset-2 focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                  title={`View full diff for ${group.filePath}`}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onSelectFile(group.filePath);
+                  }}
+                >
                   {group.filePath}
-                </span>
+                </button>
                 <span className="font-mono text-[10px] text-muted-foreground">
                   {group.changes.length}
                 </span>
               </summary>
-              <div className="space-y-0.5 px-1.5">
+              <div className="space-y-0.5 pr-1.5 pl-12">
                 {group.changes.map((change) => (
                   <button
                     key={change.entityId}
                     type="button"
-                    onClick={() => onSelect(change.entityId)}
+                    onClick={() => onSelectEntity(change.entityId)}
                     className={cn(
                       "group flex w-full items-center gap-2 rounded-md border border-transparent px-2 py-2 text-left transition-colors",
-                      selectedId === change.entityId
+                      selectedEntityId === change.entityId
                         ? "border-slate-200 bg-white shadow-xs"
                         : "hover:bg-sidebar-accent",
                     )}
@@ -240,7 +259,7 @@ function Sidebar({
                       entityType={change.entityType}
                       className={cn(
                         "size-4 shrink-0",
-                        selectedId === change.entityId
+                        selectedEntityId === change.entityId
                           ? "text-slate-800"
                           : "text-slate-500",
                       )}
@@ -350,6 +369,58 @@ function EntityDiff({ change }: { change: SemanticChange }) {
   );
 }
 
+function FileDiffView({
+  filePath,
+  patch,
+}: {
+  filePath: string;
+  patch: string;
+}) {
+  return (
+    <main className="flex h-full min-w-0 flex-col bg-[#f8f9fb]">
+      <div className="flex min-h-20 shrink-0 items-center border-b bg-white px-6 py-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2.5">
+            <FileCode2 className="size-5 text-slate-700" />
+            <h1 className="truncate text-lg font-semibold tracking-tight">
+              {filePath}
+            </h1>
+            <Badge
+              variant="outline"
+              className="rounded-md font-mono text-[10px] tracking-wide uppercase"
+            >
+              Full file
+            </Badge>
+          </div>
+          <p className="mt-1.5 font-mono text-xs text-muted-foreground">
+            Ordinary Git diff · unstaged changes
+          </p>
+        </div>
+      </div>
+
+      <ScrollArea className="min-h-0 flex-1">
+        <div className="min-w-[720px] p-5">
+          <div className="overflow-hidden rounded-lg border bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+            <PatchDiff
+              patch={patch}
+              options={{
+                diffStyle: "split",
+                diffIndicators: "bars",
+                lineDiffType: "word-alt",
+                theme: "pierre-light",
+                overflow: "scroll",
+                disableFileHeader: true,
+              }}
+              disableWorkerPool
+            />
+          </div>
+        </div>
+        <ScrollBar orientation="horizontal" />
+      </ScrollArea>
+    </main>
+  );
+}
+
 function EmptyState() {
   return (
     <div className="flex h-full items-center justify-center bg-[#f8f9fb] p-8">
@@ -371,10 +442,12 @@ function ErrorState({
   error,
   onRetry,
   isFetching,
+  title = "Unable to run semantic diff",
 }: {
   error: string;
   onRetry: () => void;
   isFetching: boolean;
+  title?: string;
 }) {
   return (
     <div className="flex h-full items-center justify-center bg-[#f8f9fb] p-8">
@@ -384,7 +457,7 @@ function ErrorState({
             <AlertTriangle className="size-4" />
           </div>
           <div className="min-w-0 flex-1">
-            <h2 className="font-semibold">Unable to run semantic diff</h2>
+            <h2 className="font-semibold">{title}</h2>
             <pre className="mt-2 overflow-auto whitespace-pre-wrap rounded-md bg-slate-950 p-3 font-mono text-xs leading-5 text-slate-200">
               {error}
             </pre>
@@ -420,6 +493,7 @@ export function SemanticDiffViewer() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const selectedFromUrl = searchParams.get("entity") ?? undefined;
+  const selectedFilePath = searchParams.get("file") ?? undefined;
   const mergeModuleChanges = searchParams.get("merge-module") !== "off";
   const query = useQuery({
     queryKey: ["semantic-diff", "unstaged"],
@@ -437,9 +511,22 @@ export function SemanticDiffViewer() {
     [diff, mergeModuleChanges],
   );
   const selectedChange =
-    visibleChanges.find((change) => change.entityId === selectedFromUrl) ??
-    visibleChanges[0];
-  const selectedId = selectedChange?.entityId;
+    selectedFilePath === undefined
+      ? (visibleChanges.find(
+          (change) => change.entityId === selectedFromUrl,
+        ) ?? visibleChanges[0])
+      : undefined;
+  const selectedEntityId = selectedChange?.entityId;
+  const fileQuery = useQuery({
+    queryKey: [
+      "file-diff",
+      "unstaged",
+      selectedFilePath,
+      diff?.refreshedAt,
+    ],
+    queryFn: () => getFileDiff(selectedFilePath!),
+    enabled: selectedFilePath !== undefined && diff !== undefined,
+  });
 
   function replaceSearchParams(params: URLSearchParams) {
     const queryString = params.toString();
@@ -452,7 +539,15 @@ export function SemanticDiffViewer() {
 
   function selectEntity(entityId: string) {
     const params = new URLSearchParams(searchParams.toString());
+    params.delete("file");
     params.set("entity", entityId);
+    replaceSearchParams(params);
+  }
+
+  function selectFile(filePath: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("entity");
+    params.set("file", filePath);
     replaceSearchParams(params);
   }
 
@@ -559,7 +654,10 @@ export function SemanticDiffViewer() {
                   size="icon"
                   variant="outline"
                   aria-label="Refresh semantic diff"
-                  onClick={() => query.refetch()}
+                  onClick={() => {
+                    query.refetch();
+                    if (selectedFilePath) fileQuery.refetch();
+                  }}
                   disabled={query.isFetching}
                 >
                   <RefreshCw
@@ -582,7 +680,9 @@ export function SemanticDiffViewer() {
             />
           ) : null}
           {diff && visibleChanges.length === 0 ? <EmptyState /> : null}
-          {diff && visibleChanges.length > 0 && selectedChange ? (
+          {diff &&
+          visibleChanges.length > 0 &&
+          (selectedFilePath || selectedChange) ? (
             <ResizablePanelGroup orientation="horizontal">
               <ResizablePanel
                 defaultSize="27%"
@@ -591,13 +691,36 @@ export function SemanticDiffViewer() {
               >
                 <Sidebar
                   changes={visibleChanges}
-                  selectedId={selectedId}
-                  onSelect={selectEntity}
+                  selectedEntityId={selectedEntityId}
+                  selectedFilePath={selectedFilePath}
+                  onSelectEntity={selectEntity}
+                  onSelectFile={selectFile}
                 />
               </ResizablePanel>
               <ResizableHandle />
               <ResizablePanel defaultSize="73%" minSize="480px">
-                <EntityDiff change={selectedChange} />
+                {selectedFilePath && fileQuery.isPending ? (
+                  <LoadingState />
+                ) : null}
+                {selectedFilePath &&
+                fileQuery.data &&
+                !fileQuery.data.ok ? (
+                  <ErrorState
+                    error={fileQuery.data.error}
+                    onRetry={() => fileQuery.refetch()}
+                    isFetching={fileQuery.isFetching}
+                    title="Unable to load file diff"
+                  />
+                ) : null}
+                {selectedFilePath && fileQuery.data?.ok ? (
+                  <FileDiffView
+                    filePath={fileQuery.data.data.filePath}
+                    patch={fileQuery.data.data.patch}
+                  />
+                ) : null}
+                {!selectedFilePath && selectedChange ? (
+                  <EntityDiff change={selectedChange} />
+                ) : null}
               </ResizablePanel>
             </ResizablePanelGroup>
           ) : null}

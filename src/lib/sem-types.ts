@@ -58,3 +58,16 @@ export type SemanticDiffResult =
       ok: false;
       error: string;
     };
+
+export type FileDiffResult =
+  | {
+      ok: true;
+      data: {
+        filePath: string;
+        patch: string;
+      };
+    }
+  | {
+      ok: false;
+      error: string;
+    };

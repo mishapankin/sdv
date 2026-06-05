@@ -4,7 +4,11 @@ import { execFile } from "node:child_process";
 import path from "node:path";
 import { promisify } from "node:util";
 
-import { semDiffSchema, type SemanticDiffResult } from "@/lib/sem-types";
+import {
+  semDiffSchema,
+  type FileDiffResult,
+  type SemanticDiffResult,
+} from "@/lib/sem-types";
 
 const execFileAsync = promisify(execFile);
 
@@ -88,5 +92,57 @@ export async function readSemanticDiff(): Promise<SemanticDiffResult> {
       ok: false,
       error: message,
     };
+  }
+}
+
+export async function readFileDiff(filePath: string): Promise<FileDiffResult> {
+  const cwd = getRepositoryDirectory();
+
+  try {
+    const { stdout: changedFilesOutput } = await run(
+      "git",
+      ["diff", "--name-only", "-z"],
+      cwd,
+    );
+    const changedFiles = new Set(
+      changedFilesOutput.split("\0").filter(Boolean),
+    );
+
+    if (!changedFiles.has(filePath)) {
+      const message = `file is not an unstaged tracked change: ${filePath}`;
+      reportError(message);
+      return { ok: false, error: message };
+    }
+
+    const { stdout: patch } = await run(
+      "git",
+      [
+        "diff",
+        "--no-ext-diff",
+        "--no-color",
+        "--find-renames",
+        "--",
+        filePath,
+      ],
+      cwd,
+    );
+
+    if (!patch.trim()) {
+      const message = `git returned no unstaged diff for: ${filePath}`;
+      reportError(message);
+      return { ok: false, error: message };
+    }
+
+    return {
+      ok: true,
+      data: {
+        filePath,
+        patch,
+      },
+    };
+  } catch (error) {
+    const message = getProcessError(error);
+    reportError(message);
+    return { ok: false, error: message };
   }
 }
