@@ -1,11 +1,17 @@
 "use client";
 
-import { parseDiffFromFile, type FileDiffMetadata } from "@pierre/diffs";
+import {
+  getSingularPatch,
+  parseDiffFromFile,
+  type FileDiffMetadata,
+} from "@pierre/diffs";
 import { FileDiff, PatchDiff } from "@pierre/diffs/react";
 import { useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
+  ArrowDown,
   ArrowRight,
+  ArrowUp,
   ChevronDown,
   CirclePlus,
   FileCode2,
@@ -20,7 +26,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useMemo } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import { getFileDiff, getSemanticDiff } from "@/app/actions";
 import { EntityIcon } from "@/components/entity-icons";
@@ -122,7 +128,7 @@ function createEntityFileDiff(
     cacheKey: `${change.entityId}:${renderVersion}:after`,
   };
   const fileDiff = parseDiffFromFile(oldFile, newFile, {
-    context: Number.POSITIVE_INFINITY,
+    context: 3,
   });
   const oldOffset = Math.max((change.oldStartLine ?? 1) - 1, 0);
   const newOffset = Math.max((change.startLine ?? 1) - 1, 0);
@@ -179,6 +185,81 @@ function SummaryStat({
     >
       {value} {label}
     </span>
+  );
+}
+
+function HunkNavigation({
+  hunks,
+  diffRootRef,
+}: {
+  hunks: FileDiffMetadata["hunks"];
+  diffRootRef: React.RefObject<HTMLDivElement | null>;
+}) {
+  const [currentHunk, setCurrentHunk] = useState(0);
+  const hasMultipleHunks = hunks.length > 1;
+
+  function jumpToHunk(index: number) {
+    const hunk = hunks[index];
+    const diffContainer =
+      diffRootRef.current?.querySelector<HTMLElement>("diffs-container");
+    const shadowRoot = diffContainer?.shadowRoot;
+
+    if (!hunk || !shadowRoot) return;
+
+    const lineNumber =
+      hunk.additionStart > 0 ? hunk.additionStart : hunk.deletionStart;
+    const line =
+      shadowRoot.querySelector<HTMLElement>(
+        `[data-line="${lineNumber}"]`,
+      ) ??
+      shadowRoot.querySelector<HTMLElement>(
+        `[data-column-number="${lineNumber}"]`,
+      );
+
+    if (!line) return;
+
+    line.scrollIntoView({ behavior: "smooth", block: "start" });
+    setCurrentHunk(index);
+  }
+
+  return (
+    <div className="flex shrink-0 items-center gap-1">
+      {hasMultipleHunks ? (
+        <span className="mr-1 font-mono text-[10px] text-muted-foreground">
+          {currentHunk + 1}/{hunks.length}
+        </span>
+      ) : null}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            aria-label="Previous hunk"
+            disabled={!hasMultipleHunks || currentHunk === 0}
+            onClick={() => jumpToHunk(currentHunk - 1)}
+          >
+            <ArrowUp />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Previous hunk</TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            aria-label="Next hunk"
+            disabled={
+              !hasMultipleHunks || currentHunk === hunks.length - 1
+            }
+            onClick={() => jumpToHunk(currentHunk + 1)}
+          >
+            <ArrowDown />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Next hunk</TooltipContent>
+      </Tooltip>
+    </div>
   );
 }
 
@@ -302,6 +383,7 @@ function EntityDiff({
     () => createEntityFileDiff(change, renderVersion),
     [change, renderVersion],
   );
+  const diffRootRef = useRef<HTMLDivElement>(null);
 
   return (
     <main className="flex h-full min-w-0 flex-col bg-background">
@@ -342,26 +424,27 @@ function EntityDiff({
           </div>
         </div>
 
-        <div className="hidden shrink-0 items-center gap-3 text-[11px] text-muted-foreground xl:flex">
+        <div className="flex shrink-0 items-center gap-3 text-[11px] text-muted-foreground">
           {change.structuralChange === false ? (
-            <span className="flex items-center gap-1.5">
+            <span className="hidden items-center gap-1.5 xl:flex">
               <Sparkles className="size-3.5" />
               cosmetic
             </span>
           ) : null}
-          <span className="font-mono">
-            {change.oldStartLine ?? "–"}:{change.oldEndLine ?? "–"}
-          </span>
-          <ArrowRight className="size-3" />
-          <span className="font-mono">
-            {change.startLine ?? "–"}:{change.endLine ?? "–"}
-          </span>
+          <HunkNavigation
+            key={`${change.entityId}:${renderVersion}`}
+            hunks={fileDiff.hunks}
+            diffRootRef={diffRootRef}
+          />
         </div>
       </div>
 
       <ScrollArea className="min-h-0 flex-1">
         <div className="min-w-[720px] p-5">
-          <div className="overflow-hidden rounded-lg border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+          <div
+            ref={diffRootRef}
+            className="overflow-hidden rounded-lg border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
+          >
             <FileDiff
               fileDiff={fileDiff}
               options={{
@@ -371,7 +454,6 @@ function EntityDiff({
                 theme: theme === "dark" ? "pierre-dark" : "pierre-light",
                 overflow: "scroll",
                 disableFileHeader: true,
-                expandUnchanged: true,
               }}
               disableWorkerPool
             />
@@ -392,9 +474,12 @@ function FileDiffView({
   patch: string;
   theme: "light" | "dark";
 }) {
+  const fileDiff = useMemo(() => getSingularPatch(patch), [patch]);
+  const diffRootRef = useRef<HTMLDivElement>(null);
+
   return (
     <main className="flex h-full min-w-0 flex-col bg-background">
-      <div className="flex min-h-20 shrink-0 items-center border-b bg-card px-6 py-3">
+      <div className="flex min-h-20 shrink-0 items-center justify-between gap-4 border-b bg-card px-6 py-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2.5">
             <FileCode2 className="size-5 text-foreground" />
@@ -412,11 +497,19 @@ function FileDiffView({
             Ordinary Git diff · unstaged changes
           </p>
         </div>
+        <HunkNavigation
+          key={patch}
+          hunks={fileDiff.hunks}
+          diffRootRef={diffRootRef}
+        />
       </div>
 
       <ScrollArea className="min-h-0 flex-1">
         <div className="min-w-[720px] p-5">
-          <div className="overflow-hidden rounded-lg border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+          <div
+            ref={diffRootRef}
+            className="overflow-hidden rounded-lg border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
+          >
             <PatchDiff
               patch={patch}
               options={{
