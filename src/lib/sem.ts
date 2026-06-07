@@ -5,8 +5,10 @@ import path from "node:path";
 import { promisify } from "node:util";
 
 import {
+  type Comparison,
   semDiffSchema,
   type FileDiffResult,
+  type GitCommitsResult,
   type SemanticDiffResult,
 } from "@/lib/sem-types";
 
@@ -42,12 +44,38 @@ function reportError(message: string) {
   console.error(`sdv: ${message}`);
 }
 
-export async function readSemanticDiff(): Promise<SemanticDiffResult> {
+function getSemDiffArgs(comparison: Comparison) {
+  const args = ["diff", "--verbose", "--format", "json"];
+
+  if (comparison.mode === "staged") {
+    args.push("--staged");
+  } else if (comparison.mode === "commits") {
+    args.push("--from", comparison.from, "--to", comparison.to);
+  }
+
+  return args;
+}
+
+function getGitDiffArgs(comparison: Comparison) {
+  if (comparison.mode === "staged") {
+    return ["diff", "--cached"];
+  }
+
+  if (comparison.mode === "commits") {
+    return ["diff", comparison.from, comparison.to];
+  }
+
+  return ["diff"];
+}
+
+export async function readSemanticDiff(
+  comparison: Comparison,
+): Promise<SemanticDiffResult> {
   const cwd = getRepositoryDirectory();
 
   try {
     const [{ stdout }, branchResult, rootResult] = await Promise.all([
-      run("sem", ["diff", "--verbose", "--format", "json"], cwd),
+      run("sem", getSemDiffArgs(comparison), cwd),
       run("git", ["branch", "--show-current"], cwd),
       run("git", ["rev-parse", "--show-toplevel"], cwd),
     ]);
@@ -95,13 +123,17 @@ export async function readSemanticDiff(): Promise<SemanticDiffResult> {
   }
 }
 
-export async function readFileDiff(filePath: string): Promise<FileDiffResult> {
+export async function readFileDiff(
+  filePath: string,
+  comparison: Comparison,
+): Promise<FileDiffResult> {
   const cwd = getRepositoryDirectory();
+  const diffArgs = getGitDiffArgs(comparison);
 
   try {
     const { stdout: changedFilesOutput } = await run(
       "git",
-      ["diff", "--name-only", "-z"],
+      [...diffArgs, "--name-only", "-z"],
       cwd,
     );
     const changedFiles = new Set(
@@ -109,7 +141,7 @@ export async function readFileDiff(filePath: string): Promise<FileDiffResult> {
     );
 
     if (!changedFiles.has(filePath)) {
-      const message = `file is not an unstaged tracked change: ${filePath}`;
+      const message = `file is not part of the selected comparison: ${filePath}`;
       reportError(message);
       return { ok: false, error: message };
     }
@@ -117,7 +149,7 @@ export async function readFileDiff(filePath: string): Promise<FileDiffResult> {
     const { stdout: patch } = await run(
       "git",
       [
-        "diff",
+        ...diffArgs,
         "--no-ext-diff",
         "--no-color",
         "--find-renames",
@@ -128,7 +160,7 @@ export async function readFileDiff(filePath: string): Promise<FileDiffResult> {
     );
 
     if (!patch.trim()) {
-      const message = `git returned no unstaged diff for: ${filePath}`;
+      const message = `git returned no diff for: ${filePath}`;
       reportError(message);
       return { ok: false, error: message };
     }
@@ -140,6 +172,47 @@ export async function readFileDiff(filePath: string): Promise<FileDiffResult> {
         patch,
       },
     };
+  } catch (error) {
+    const message = getProcessError(error);
+    reportError(message);
+    return { ok: false, error: message };
+  }
+}
+
+export async function readRecentCommits(): Promise<GitCommitsResult> {
+  const cwd = getRepositoryDirectory();
+
+  try {
+    const { stdout } = await run(
+      "git",
+      [
+        "log",
+        "--all",
+        "-n",
+        "100",
+        "--date=relative",
+        "--format=%H%x1f%h%x1f%s%x1f%ar%x1f%D%x1e",
+      ],
+      cwd,
+    );
+    const commits = stdout
+      .split("\x1e")
+      .map((record) => record.trim())
+      .filter(Boolean)
+      .map((record) => {
+        const [hash, shortHash, subject, relativeDate, refs] =
+          record.split("\x1f");
+
+        return {
+          hash: hash ?? "",
+          shortHash: shortHash ?? "",
+          subject: subject ?? "",
+          relativeDate: relativeDate ?? "",
+          refs: refs ?? "",
+        };
+      });
+
+    return { ok: true, data: commits };
   } catch (error) {
     const message = getProcessError(error);
     reportError(message);

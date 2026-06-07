@@ -16,6 +16,7 @@ import {
   CirclePlus,
   FileCode2,
   GitBranch,
+  GitCommitHorizontal,
   GitCompareArrows,
   GitMerge,
   LoaderCircle,
@@ -28,11 +29,16 @@ import {
 import { usePathname, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { getFileDiff, getSemanticDiff } from "@/app/actions";
+import {
+  getFileDiff,
+  getRecentCommits,
+  getSemanticDiff,
+} from "@/app/actions";
 import { EntityIcon } from "@/components/entity-icons";
 import { ThemeToggle, useTheme } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -40,12 +46,24 @@ import {
 } from "@/components/ui/resizable";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import type { ChangeType, SemanticChange } from "@/lib/sem-types";
+import type {
+  ChangeType,
+  Comparison,
+  GitCommit,
+  SemanticChange,
+} from "@/lib/sem-types";
 import { mergeModuleLevelChanges } from "@/lib/merge-module-changes";
 import { cn } from "@/lib/utils";
 
@@ -90,6 +108,149 @@ const changeStyles: Record<
       "border-cyan-200 bg-cyan-50 text-cyan-700 dark:border-cyan-800 dark:bg-cyan-950 dark:text-cyan-300",
   },
 };
+
+function getComparisonFromSearchParams(
+  searchParams: Pick<URLSearchParams, "get">,
+): Comparison {
+  const mode = searchParams.get("mode");
+
+  if (mode === "staged") {
+    return { mode: "staged" };
+  }
+
+  if (mode === "commits") {
+    return {
+      mode: "commits",
+      from: searchParams.get("from") || "HEAD~1",
+      to: searchParams.get("to") || "HEAD",
+    };
+  }
+
+  return { mode: "unstaged" };
+}
+
+function getComparisonLabel(comparison: Comparison) {
+  if (comparison.mode === "staged") return "Staged changes";
+  if (comparison.mode === "commits") {
+    return `${comparison.from} → ${comparison.to}`;
+  }
+  return "Unstaged changes";
+}
+
+function getSemCommand(comparison: Comparison) {
+  if (comparison.mode === "staged") {
+    return "sem diff --staged --verbose --format json";
+  }
+
+  if (comparison.mode === "commits") {
+    return `sem diff --from ${comparison.from} --to ${comparison.to} --verbose --format json`;
+  }
+
+  return "sem diff --verbose --format json";
+}
+
+function CommitSuggestions({
+  id,
+  commits,
+}: {
+  id: string;
+  commits: GitCommit[];
+}) {
+  return (
+    <datalist id={id}>
+      {commits.map((commit) => (
+        <option
+          key={commit.hash}
+          value={commit.shortHash}
+          label={`${commit.subject} · ${commit.relativeDate}${commit.refs ? ` · ${commit.refs}` : ""}`}
+        />
+      ))}
+    </datalist>
+  );
+}
+
+function ComparisonSelector({
+  comparison,
+  commits,
+  onModeChange,
+  onCompare,
+}: {
+  comparison: Comparison;
+  commits: GitCommit[];
+  onModeChange: (mode: Comparison["mode"]) => void;
+  onCompare: (from: string, to: string) => void;
+}) {
+  const [from, setFrom] = useState(
+    comparison.mode === "commits" ? comparison.from : "HEAD~1",
+  );
+  const [to, setTo] = useState(
+    comparison.mode === "commits" ? comparison.to : "HEAD",
+  );
+
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      <Select
+        value={comparison.mode}
+        onValueChange={(value) =>
+          onModeChange(value as Comparison["mode"])
+        }
+      >
+        <SelectTrigger
+          size="sm"
+          aria-label="Changes to view"
+          className="w-[150px] bg-background"
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent align="start">
+          <SelectItem value="unstaged">Unstaged changes</SelectItem>
+          <SelectItem value="staged">Staged changes</SelectItem>
+          <SelectItem value="commits">Compare commits</SelectItem>
+        </SelectContent>
+      </Select>
+
+      {comparison.mode === "commits" ? (
+        <form
+          className="flex min-w-0 items-center gap-1.5"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (from.trim() && to.trim()) {
+              onCompare(from.trim(), to.trim());
+            }
+          }}
+        >
+          <Input
+            list="sdv-from-commits"
+            aria-label="Base commit"
+            value={from}
+            onChange={(event) => setFrom(event.target.value)}
+            placeholder="Base ref"
+            className="h-7 w-32 font-mono text-xs"
+          />
+          <span className="text-xs text-muted-foreground">...</span>
+          <Input
+            list="sdv-to-commits"
+            aria-label="Head commit"
+            value={to}
+            onChange={(event) => setTo(event.target.value)}
+            placeholder="Head ref"
+            className="h-7 w-32 font-mono text-xs"
+          />
+          <CommitSuggestions id="sdv-from-commits" commits={commits} />
+          <CommitSuggestions id="sdv-to-commits" commits={commits} />
+          <Button
+            type="submit"
+            size="sm"
+            variant="secondary"
+            disabled={!from.trim() || !to.trim()}
+          >
+            Compare
+          </Button>
+        </form>
+      ) : null}
+    </div>
+  );
+}
 
 function groupByFile(changes: SemanticChange[]) {
   const groups = new Map<string, SemanticChange[]>();
@@ -554,10 +715,12 @@ function FileDiffView({
   filePath,
   patch,
   theme,
+  comparison,
 }: {
   filePath: string;
   patch: string;
   theme: "light" | "dark";
+  comparison: Comparison;
 }) {
   const fileDiff = useMemo(() => getSingularPatch(patch), [patch]);
   const diffRootRef = useRef<HTMLDivElement>(null);
@@ -606,7 +769,7 @@ function FileDiffView({
             </Badge>
           </div>
           <p className="mt-1.5 font-mono text-xs text-muted-foreground">
-            Ordinary Git diff · unstaged changes
+            Ordinary Git diff · {getComparisonLabel(comparison)}
           </p>
         </div>
         <HunkNavigation
@@ -641,17 +804,17 @@ function FileDiffView({
   );
 }
 
-function EmptyState() {
+function EmptyState({ comparison }: { comparison: Comparison }) {
   return (
     <div className="flex h-full items-center justify-center bg-background p-8">
       <div className="max-w-sm text-center">
         <div className="mx-auto flex size-12 items-center justify-center rounded-xl border bg-card shadow-sm">
           <SearchX className="size-5 text-muted-foreground" />
         </div>
-        <h2 className="mt-4 text-base font-semibold">Working tree is clean</h2>
+        <h2 className="mt-4 text-base font-semibold">No changes found</h2>
         <p className="mt-1.5 text-sm leading-6 text-muted-foreground">
-          No semantic entities changed in tracked, unstaged files. Edit a file
-          and refresh to inspect its semantic diff.
+          `sem` found no semantic entity changes for{" "}
+          {getComparisonLabel(comparison).toLowerCase()}.
         </p>
       </div>
     </div>
@@ -713,12 +876,18 @@ export function SemanticDiffViewer() {
   const theme = useTheme();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const comparison = getComparisonFromSearchParams(searchParams);
   const selectedFromUrl = searchParams.get("entity") ?? undefined;
   const selectedFilePath = searchParams.get("file") ?? undefined;
   const mergeModuleChanges = searchParams.get("merge-module") !== "off";
   const query = useQuery({
-    queryKey: ["semantic-diff", "unstaged"],
-    queryFn: getSemanticDiff,
+    queryKey: ["semantic-diff", comparison],
+    queryFn: () => getSemanticDiff(comparison),
+  });
+  const commitsQuery = useQuery({
+    queryKey: ["git-commits"],
+    queryFn: getRecentCommits,
+    staleTime: 30_000,
   });
   const result = query.data;
   const diff = result?.ok ? result.data : undefined;
@@ -748,8 +917,8 @@ export function SemanticDiffViewer() {
       )
     : -1;
   const fileQuery = useQuery({
-    queryKey: ["file-diff", "unstaged", selectedFilePath],
-    queryFn: () => getFileDiff(selectedFilePath!),
+    queryKey: ["file-diff", comparison, selectedFilePath],
+    queryFn: () => getFileDiff(selectedFilePath!, comparison),
     enabled: selectedFilePath !== undefined && diff !== undefined,
   });
   const isRefreshing = query.isFetching || fileQuery.isFetching;
@@ -774,6 +943,44 @@ export function SemanticDiffViewer() {
     const params = new URLSearchParams(searchParams.toString());
     params.delete("entity");
     params.set("file", filePath);
+    replaceSearchParams(params);
+  }
+
+  function selectComparisonMode(mode: Comparison["mode"]) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("entity");
+    params.delete("file");
+
+    if (mode === "unstaged") {
+      params.delete("mode");
+      params.delete("from");
+      params.delete("to");
+    } else if (mode === "staged") {
+      params.set("mode", "staged");
+      params.delete("from");
+      params.delete("to");
+    } else {
+      params.set("mode", "commits");
+      params.set(
+        "from",
+        comparison.mode === "commits" ? comparison.from : "HEAD~1",
+      );
+      params.set(
+        "to",
+        comparison.mode === "commits" ? comparison.to : "HEAD",
+      );
+    }
+
+    replaceSearchParams(params);
+  }
+
+  function compareCommits(from: string, to: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("mode", "commits");
+    params.set("from", from);
+    params.set("to", to);
+    params.delete("entity");
+    params.delete("file");
     replaceSearchParams(params);
   }
 
@@ -814,7 +1021,7 @@ export function SemanticDiffViewer() {
   return (
     <TooltipProvider>
       <div className="flex h-dvh min-h-[520px] flex-col overflow-hidden bg-background">
-        <header className="flex h-14 shrink-0 items-center justify-between border-b bg-card px-4">
+        <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b bg-card px-4">
           <div className="flex min-w-0 items-center gap-4">
             <div className="flex items-center gap-2">
               <div className="flex size-7 items-center justify-center rounded-md bg-slate-950 text-white shadow-sm">
@@ -870,12 +1077,6 @@ export function SemanticDiffViewer() {
                 />
               </div>
             ) : null}
-            <Badge
-              variant="outline"
-              className="hidden h-7 rounded-md px-2.5 font-mono text-[10px] tracking-wide uppercase sm:flex"
-            >
-              Unstaged
-            </Badge>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -913,6 +1114,20 @@ export function SemanticDiffViewer() {
           </div>
         </header>
 
+        <div className="flex min-h-11 shrink-0 items-center gap-3 overflow-x-auto border-b bg-muted/30 px-4 py-2">
+          <div className="flex shrink-0 items-center gap-2 text-xs font-medium text-muted-foreground">
+            <GitCommitHorizontal className="size-4" />
+            Compare
+          </div>
+          <ComparisonSelector
+            key={getComparisonLabel(comparison)}
+            comparison={comparison}
+            commits={commitsQuery.data?.ok ? commitsQuery.data.data : []}
+            onModeChange={selectComparisonMode}
+            onCompare={compareCommits}
+          />
+        </div>
+
         <div className="min-h-0 flex-1">
           {query.isPending ? <LoadingState /> : null}
           {result && !result.ok ? (
@@ -922,7 +1137,9 @@ export function SemanticDiffViewer() {
               isFetching={query.isFetching}
             />
           ) : null}
-          {diff && visibleChanges.length === 0 ? <EmptyState /> : null}
+          {diff && visibleChanges.length === 0 ? (
+            <EmptyState comparison={comparison} />
+          ) : null}
           {diff &&
           visibleChanges.length > 0 &&
           (selectedFilePath || selectedChange) ? (
@@ -955,6 +1172,7 @@ export function SemanticDiffViewer() {
                     filePath={fileQuery.data.data.filePath}
                     patch={fileQuery.data.data.patch}
                     theme={theme}
+                    comparison={comparison}
                   />
                 ) : null}
                 {!selectedFilePath && selectedChange ? (
@@ -991,7 +1209,7 @@ export function SemanticDiffViewer() {
         <footer className="flex h-7 shrink-0 items-center justify-between border-t bg-card px-3 font-mono text-[10px] text-muted-foreground">
           <span className="flex items-center gap-1.5">
             <CirclePlus className="size-3" />
-            sem diff --verbose --format json
+            {getSemCommand(comparison)}
           </span>
           {diff ? (
             <span className="flex items-center gap-1.5">

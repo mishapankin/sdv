@@ -1,5 +1,17 @@
 import { z } from "zod";
 
+export const comparisonSchema = z.discriminatedUnion("mode", [
+  z.object({ mode: z.literal("unstaged") }),
+  z.object({ mode: z.literal("staged") }),
+  z.object({
+    mode: z.literal("commits"),
+    from: z.string().min(1).max(256),
+    to: z.string().min(1).max(256),
+  }),
+]);
+
+export type Comparison = z.infer<typeof comparisonSchema>;
+
 export const changeTypeSchema = z.enum([
   "added",
   "modified",
@@ -66,6 +78,24 @@ export type FileDiffResult =
         filePath: string;
         patch: string;
       };
+    }
+  | {
+      ok: false;
+      error: string;
+    };
+
+export type GitCommit = {
+  hash: string;
+  shortHash: string;
+  subject: string;
+  relativeDate: string;
+  refs: string;
+};
+
+export type GitCommitsResult =
+  | {
+      ok: true;
+      data: GitCommit[];
     }
   | {
       ok: false;

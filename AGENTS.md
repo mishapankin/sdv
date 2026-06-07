@@ -19,8 +19,8 @@ over the `sem` CLI and should not grow unrelated source-control features.
 - It does not need to open a browser automatically.
 - The default comparison is unstaged tracked changes: `sem diff --verbose
   --format json`.
-- The MVP supports unstaged changes only. Do not add staged or commit-range
-  selectors yet.
+- The MVP supports unstaged changes, staged changes, and comparisons between
+  two user-provided Git refs.
 - Refresh reruns `sem`; do not maintain a separate diff model or cache.
 - The sidebar is grouped by file. Each file lists its changed semantic entities
   with a Lucide icon for entity type and a label/icon for change type such as
@@ -43,7 +43,7 @@ over the `sem` CLI and should not grow unrelated source-control features.
 - TanStack Query (`@tanstack/react-query`) for client-side server state,
   refresh, and comparison changes
 - `@pierre/diffs` for split or unified code diffs with Shiki syntax
-  highlighting (pending installation)
+  highlighting
 - Zod for validating Server Function inputs and `sem` JSON at the process
   boundary
 - pnpm as the package manager

@@ -27,7 +27,11 @@ sdv
 ```
 
 The server starts at `http://localhost:1555` and displays semantic entities from
-tracked, unstaged changes. Use the refresh button to rerun:
+tracked, unstaged changes by default. The comparison bar can switch to staged
+changes or compare two Git refs such as `HEAD~3` and `HEAD`. Recent commits are
+offered as searchable suggestions, and arbitrary valid refs are accepted.
+
+Use the refresh button to rerun the active comparison. The default command is:
 
 ```bash
 sem diff --verbose --format json
