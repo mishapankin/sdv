@@ -11,12 +11,9 @@ import {
   type GitCommitsResult,
   type SemanticDiffResult,
 } from "@/lib/sem-types";
+import { resolveRepositoryDirectory } from "@/lib/workspace";
 
 const execFileAsync = promisify(execFile);
-
-function getRepositoryDirectory() {
-  return process.env.SDV_REPO_CWD || process.cwd();
-}
 
 async function run(command: string, args: string[], cwd: string) {
   return execFileAsync(command, args, {
@@ -70,10 +67,10 @@ function getGitDiffArgs(comparison: Comparison) {
 
 export async function readSemanticDiff(
   comparison: Comparison,
+  repoId?: string,
 ): Promise<SemanticDiffResult> {
-  const cwd = getRepositoryDirectory();
-
   try {
+    const cwd = await resolveRepositoryDirectory(repoId);
     const [{ stdout }, branchResult, rootResult] = await Promise.all([
       run("sem", getSemDiffArgs(comparison), cwd),
       run("git", ["branch", "--show-current"], cwd),
@@ -126,11 +123,12 @@ export async function readSemanticDiff(
 export async function readFileDiff(
   filePath: string,
   comparison: Comparison,
+  repoId?: string,
 ): Promise<FileDiffResult> {
-  const cwd = getRepositoryDirectory();
   const diffArgs = getGitDiffArgs(comparison);
 
   try {
+    const cwd = await resolveRepositoryDirectory(repoId);
     const { stdout: changedFilesOutput } = await run(
       "git",
       [...diffArgs, "--name-only", "-z"],
@@ -179,10 +177,11 @@ export async function readFileDiff(
   }
 }
 
-export async function readRecentCommits(): Promise<GitCommitsResult> {
-  const cwd = getRepositoryDirectory();
-
+export async function readRecentCommits(
+  repoId?: string,
+): Promise<GitCommitsResult> {
   try {
+    const cwd = await resolveRepositoryDirectory(repoId);
     const { stdout } = await run(
       "git",
       [

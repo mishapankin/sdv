@@ -15,6 +15,7 @@ import {
   ChevronDown,
   CirclePlus,
   FileCode2,
+  FolderGit2,
   GitBranch,
   GitCommitHorizontal,
   GitCompareArrows,
@@ -33,6 +34,7 @@ import {
   getFileDiff,
   getRecentCommits,
   getSemanticDiff,
+  getWorkspaceRepositories,
 } from "@/app/actions";
 import { EntityIcon } from "@/components/entity-icons";
 import { ThemeToggle, useTheme } from "@/components/theme-toggle";
@@ -63,6 +65,7 @@ import type {
   Comparison,
   GitCommit,
   SemanticChange,
+  WorkspaceRepository,
 } from "@/lib/sem-types";
 import { mergeModuleLevelChanges } from "@/lib/merge-module-changes";
 import { cn } from "@/lib/utils";
@@ -346,6 +349,114 @@ function SummaryStat({
     >
       {value} {label}
     </span>
+  );
+}
+
+function RepositoryRail({
+  workspaceName,
+  repositories,
+  selectedRepoId,
+  onSelectRepo,
+  onRefreshAll,
+  isRefreshing,
+}: {
+  workspaceName: string;
+  repositories: WorkspaceRepository[];
+  selectedRepoId?: string;
+  onSelectRepo: (repoId: string) => void;
+  onRefreshAll: () => void;
+  isRefreshing: boolean;
+}) {
+  const dirtyCount = repositories.filter((repo) => repo.hasChanges).length;
+
+  return (
+    <aside className="flex h-full w-[286px] shrink-0 flex-col border-r bg-sidebar">
+      <div className="flex h-12 shrink-0 items-center justify-between gap-3 border-b px-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <FolderGit2 className="size-4 shrink-0 text-muted-foreground" />
+            <span className="truncate text-xs font-semibold">
+              {workspaceName}
+            </span>
+          </div>
+          <div className="mt-0.5 font-mono text-[10px] text-muted-foreground">
+            {dirtyCount}/{repositories.length} changed
+          </div>
+        </div>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="icon-sm"
+              variant="outline"
+              aria-label="Refresh all repositories"
+              onClick={onRefreshAll}
+              disabled={isRefreshing}
+            >
+              <RefreshCw className={cn(isRefreshing && "animate-spin")} />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Refresh all repositories</TooltipContent>
+        </Tooltip>
+      </div>
+
+      <ScrollArea className="min-h-0 flex-1">
+        <nav aria-label="Workspace repositories" className="space-y-1 p-2">
+          {repositories.map((repo) => (
+            <button
+              key={repo.id}
+              type="button"
+              onClick={() => onSelectRepo(repo.id)}
+              className={cn(
+                "group flex w-full items-center gap-2 rounded-md border px-2.5 py-2 text-left transition-colors",
+                selectedRepoId === repo.id
+                  ? "border-border bg-card shadow-xs"
+                  : "border-transparent hover:bg-sidebar-accent",
+              )}
+            >
+              <span
+                className={cn(
+                  "size-2.5 shrink-0 rounded-full border",
+                  repo.error
+                    ? "border-rose-500 bg-rose-500"
+                    : repo.hasChanges
+                      ? "border-amber-500 bg-amber-500"
+                      : "border-emerald-600 bg-emerald-600",
+                )}
+                aria-hidden="true"
+              />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[13px] font-medium">
+                  {repo.name}
+                </span>
+                <span className="mt-0.5 flex min-w-0 items-center gap-1.5 truncate font-mono text-[10px] text-muted-foreground">
+                  <GitBranch className="size-3 shrink-0" />
+                  <span className="truncate">
+                    {repo.relativePath} · {repo.branchName}
+                  </span>
+                </span>
+              </span>
+              <span
+                className={cn(
+                  "flex h-5 min-w-5 shrink-0 items-center justify-center rounded border px-1 font-mono text-[10px] font-bold",
+                  repo.error
+                    ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300"
+                    : repo.hasChanges
+                      ? "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300"
+                      : "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300",
+                )}
+                title={
+                  repo.error
+                    ? repo.error
+                    : `${repo.changedFileCount} changed tracked files`
+                }
+              >
+                {repo.error ? "!" : repo.changedFileCount}
+              </span>
+            </button>
+          ))}
+        </nav>
+      </ScrollArea>
+    </aside>
   );
 }
 
@@ -806,7 +917,7 @@ function FileDiffView({
 
 function EmptyState({ comparison }: { comparison: Comparison }) {
   return (
-    <div className="flex h-full items-center justify-center bg-background p-8">
+    <div className="flex h-full w-full items-center justify-center bg-background p-8">
       <div className="max-w-sm text-center">
         <div className="mx-auto flex size-12 items-center justify-center rounded-xl border bg-card shadow-sm">
           <SearchX className="size-5 text-muted-foreground" />
@@ -833,7 +944,7 @@ function ErrorState({
   title?: string;
 }) {
   return (
-    <div className="flex h-full items-center justify-center bg-background p-8">
+    <div className="flex h-full w-full items-center justify-center bg-background p-8">
       <div className="w-full max-w-lg rounded-xl border border-rose-200 bg-card p-5 shadow-sm dark:border-rose-900">
         <div className="flex items-start gap-3">
           <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300">
@@ -863,10 +974,29 @@ function ErrorState({
 
 function LoadingState() {
   return (
-    <div className="flex h-full items-center justify-center bg-background">
+    <div className="flex h-full w-full items-center justify-center bg-background">
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <LoaderCircle className="size-4 animate-spin" />
         Running sem diff
+      </div>
+    </div>
+  );
+}
+
+function NoRepositoriesState() {
+  return (
+    <div className="flex h-full w-full items-center justify-center bg-background p-8">
+      <div className="max-w-sm text-center">
+        <div className="mx-auto flex size-12 items-center justify-center rounded-xl border bg-card shadow-sm">
+          <FolderGit2 className="size-5 text-muted-foreground" />
+        </div>
+        <h2 className="mt-4 text-base font-semibold">
+          No repositories found
+        </h2>
+        <p className="mt-1.5 text-sm leading-6 text-muted-foreground">
+          Run `sdv` inside a Git repository or from a folder containing Git
+          repositories as direct child directories.
+        </p>
       </div>
     </div>
   );
@@ -877,16 +1007,42 @@ export function SemanticDiffViewer() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const comparison = getComparisonFromSearchParams(searchParams);
+  const requestedRepoId = searchParams.get("repo") ?? undefined;
   const selectedFromUrl = searchParams.get("entity") ?? undefined;
   const selectedFilePath = searchParams.get("file") ?? undefined;
   const mergeModuleChanges = searchParams.get("merge-module") !== "off";
+  const repositoriesQuery = useQuery({
+    queryKey: ["workspace-repositories"],
+    queryFn: getWorkspaceRepositories,
+  });
+  const repositories = useMemo(
+    () =>
+      repositoriesQuery.data?.ok
+        ? repositoriesQuery.data.data.repositories
+        : [],
+    [repositoriesQuery.data],
+  );
+  const showRepositoryRail = repositories.some((repo) => repo.id !== ".");
+  const selectedRepoId = requestedRepoId ?? repositories[0]?.id;
+  const activeRepository =
+    repositories.find((repo) => repo.id === selectedRepoId);
+  const activeRepoId = activeRepository?.id;
+  useEffect(() => {
+    if (requestedRepoId || !showRepositoryRail || !repositories[0]) return;
+
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("repo", repositories[0].id);
+    window.history.replaceState(null, "", `${pathname}?${params.toString()}`);
+  }, [pathname, repositories, requestedRepoId, searchParams, showRepositoryRail]);
   const query = useQuery({
-    queryKey: ["semantic-diff", comparison],
-    queryFn: () => getSemanticDiff(comparison),
+    queryKey: ["semantic-diff", activeRepoId, comparison],
+    queryFn: () => getSemanticDiff(comparison, activeRepoId),
+    enabled: activeRepoId !== undefined,
   });
   const commitsQuery = useQuery({
-    queryKey: ["git-commits"],
-    queryFn: getRecentCommits,
+    queryKey: ["git-commits", activeRepoId],
+    queryFn: () => getRecentCommits(activeRepoId),
+    enabled: activeRepoId !== undefined,
     staleTime: 30_000,
   });
   const result = query.data;
@@ -917,11 +1073,15 @@ export function SemanticDiffViewer() {
       )
     : -1;
   const fileQuery = useQuery({
-    queryKey: ["file-diff", comparison, selectedFilePath],
-    queryFn: () => getFileDiff(selectedFilePath!, comparison),
-    enabled: selectedFilePath !== undefined && diff !== undefined,
+    queryKey: ["file-diff", activeRepoId, comparison, selectedFilePath],
+    queryFn: () => getFileDiff(selectedFilePath!, comparison, activeRepoId),
+    enabled:
+      activeRepoId !== undefined &&
+      selectedFilePath !== undefined &&
+      diff !== undefined,
   });
-  const isRefreshing = query.isFetching || fileQuery.isFetching;
+  const isRefreshing =
+    repositoriesQuery.isFetching || query.isFetching || fileQuery.isFetching;
 
   function replaceSearchParams(params: URLSearchParams) {
     const queryString = params.toString();
@@ -936,6 +1096,20 @@ export function SemanticDiffViewer() {
     const params = new URLSearchParams(searchParams.toString());
     params.delete("file");
     params.set("entity", entityId);
+    replaceSearchParams(params);
+  }
+
+  function selectRepository(repoId: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("entity");
+    params.delete("file");
+
+    if (repoId === ".") {
+      params.delete("repo");
+    } else {
+      params.set("repo", repoId);
+    }
+
     replaceSearchParams(params);
   }
 
@@ -1016,6 +1190,11 @@ export function SemanticDiffViewer() {
       if (!refreshed.data?.ok) return;
       await fileQuery.refetch();
     }
+  }
+
+  async function refreshAll() {
+    await repositoriesQuery.refetch();
+    await refreshDiff();
   }
 
   return (
@@ -1128,81 +1307,115 @@ export function SemanticDiffViewer() {
           />
         </div>
 
-        <div className="min-h-0 flex-1">
-          {query.isPending ? <LoadingState /> : null}
-          {result && !result.ok ? (
+        <div className="flex min-h-0 flex-1">
+          {repositoriesQuery.isPending ? <LoadingState /> : null}
+          {repositoriesQuery.data && !repositoriesQuery.data.ok ? (
             <ErrorState
-              error={result.error}
-              onRetry={() => query.refetch()}
-              isFetching={query.isFetching}
+              error={repositoriesQuery.data.error}
+              onRetry={() => repositoriesQuery.refetch()}
+              isFetching={repositoriesQuery.isFetching}
+              title="Unable to inspect workspace"
             />
           ) : null}
-          {diff && visibleChanges.length === 0 ? (
-            <EmptyState comparison={comparison} />
+          {repositoriesQuery.data?.ok && repositories.length === 0 ? (
+            <NoRepositoriesState />
           ) : null}
-          {diff &&
-          visibleChanges.length > 0 &&
-          (selectedFilePath || selectedChange) ? (
-            <ResizablePanelGroup orientation="horizontal">
-              <ResizablePanel defaultSize="27%" minSize="220px" maxSize="42%">
-                <Sidebar
-                  changes={visibleChanges}
-                  selectedEntityId={selectedEntityId}
-                  selectedFilePath={selectedFilePath}
-                  onSelectEntity={selectEntity}
-                  onSelectFile={selectFile}
+          {repositoriesQuery.data?.ok && repositories.length > 0 ? (
+            <>
+              {showRepositoryRail ? (
+                <RepositoryRail
+                  workspaceName={repositoriesQuery.data.data.workspaceName}
+                  repositories={repositories}
+                  selectedRepoId={activeRepoId}
+                  onSelectRepo={selectRepository}
+                  onRefreshAll={refreshAll}
+                  isRefreshing={isRefreshing}
                 />
-              </ResizablePanel>
-              <ResizableHandle />
-              <ResizablePanel defaultSize="73%" minSize="480px">
-                {selectedFilePath && fileQuery.isPending ? (
-                  <LoadingState />
-                ) : null}
-                {selectedFilePath && fileQuery.data && !fileQuery.data.ok ? (
+              ) : null}
+              <div className="min-w-0 flex-1">
+                {query.isPending ? <LoadingState /> : null}
+                {result && !result.ok ? (
                   <ErrorState
-                    error={fileQuery.data.error}
-                    onRetry={() => fileQuery.refetch()}
-                    isFetching={fileQuery.isFetching}
-                    title="Unable to load file diff"
+                    error={result.error}
+                    onRetry={() => query.refetch()}
+                    isFetching={query.isFetching}
                   />
                 ) : null}
-                {selectedFilePath && fileQuery.data?.ok ? (
-                  <FileDiffView
-                    key={`${fileQuery.data.data.filePath}:${fileQuery.data.data.patch}`}
-                    filePath={fileQuery.data.data.filePath}
-                    patch={fileQuery.data.data.patch}
-                    theme={theme}
-                    comparison={comparison}
-                  />
+                {diff && visibleChanges.length === 0 ? (
+                  <EmptyState comparison={comparison} />
                 ) : null}
-                {!selectedFilePath && selectedChange ? (
-                  <EntityDiff
-                    key={`${selectedChange.entityId}:${diff.refreshedAt}`}
-                    change={selectedChange}
-                    theme={theme}
-                    renderVersion={diff.refreshedAt}
-                    onPreviousEntity={
-                      selectedEntityIndex > 0
-                        ? () =>
-                            selectEntity(
-                              navigableChanges[selectedEntityIndex - 1]
-                                .entityId,
-                            )
-                        : undefined
-                    }
-                    onNextEntity={
-                      selectedEntityIndex < navigableChanges.length - 1
-                        ? () =>
-                            selectEntity(
-                              navigableChanges[selectedEntityIndex + 1]
-                                .entityId,
-                            )
-                        : undefined
-                    }
-                  />
+                {diff &&
+                visibleChanges.length > 0 &&
+                (selectedFilePath || selectedChange) ? (
+                  <ResizablePanelGroup orientation="horizontal">
+                    <ResizablePanel
+                      defaultSize="27%"
+                      minSize="220px"
+                      maxSize="42%"
+                    >
+                      <Sidebar
+                        changes={visibleChanges}
+                        selectedEntityId={selectedEntityId}
+                        selectedFilePath={selectedFilePath}
+                        onSelectEntity={selectEntity}
+                        onSelectFile={selectFile}
+                      />
+                    </ResizablePanel>
+                    <ResizableHandle />
+                    <ResizablePanel defaultSize="73%" minSize="480px">
+                      {selectedFilePath && fileQuery.isPending ? (
+                        <LoadingState />
+                      ) : null}
+                      {selectedFilePath &&
+                      fileQuery.data &&
+                      !fileQuery.data.ok ? (
+                        <ErrorState
+                          error={fileQuery.data.error}
+                          onRetry={() => fileQuery.refetch()}
+                          isFetching={fileQuery.isFetching}
+                          title="Unable to load file diff"
+                        />
+                      ) : null}
+                      {selectedFilePath && fileQuery.data?.ok ? (
+                        <FileDiffView
+                          key={`${fileQuery.data.data.filePath}:${fileQuery.data.data.patch}`}
+                          filePath={fileQuery.data.data.filePath}
+                          patch={fileQuery.data.data.patch}
+                          theme={theme}
+                          comparison={comparison}
+                        />
+                      ) : null}
+                      {!selectedFilePath && selectedChange ? (
+                        <EntityDiff
+                          key={`${selectedChange.entityId}:${diff.refreshedAt}`}
+                          change={selectedChange}
+                          theme={theme}
+                          renderVersion={diff.refreshedAt}
+                          onPreviousEntity={
+                            selectedEntityIndex > 0
+                              ? () =>
+                                  selectEntity(
+                                    navigableChanges[selectedEntityIndex - 1]
+                                      .entityId,
+                                  )
+                              : undefined
+                          }
+                          onNextEntity={
+                            selectedEntityIndex < navigableChanges.length - 1
+                              ? () =>
+                                  selectEntity(
+                                    navigableChanges[selectedEntityIndex + 1]
+                                      .entityId,
+                                  )
+                              : undefined
+                          }
+                        />
+                      ) : null}
+                    </ResizablePanel>
+                  </ResizablePanelGroup>
                 ) : null}
-              </ResizablePanel>
-            </ResizablePanelGroup>
+              </div>
+            </>
           ) : null}
         </div>
 

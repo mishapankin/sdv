@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawn, spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import http from "node:http";
 import { constants as osConstants } from "node:os";
 import path from "node:path";
@@ -26,12 +26,34 @@ function parsePort(value) {
   return port;
 }
 
+function parseSearchDepth(value) {
+  if (value === "unlimited") {
+    return value;
+  }
+
+  const depth = Number.parseInt(value, 10);
+
+  if (!Number.isInteger(depth) || String(depth) !== value || depth < 0) {
+    throw new InvalidArgumentError(
+      'must be a non-negative integer or "unlimited"',
+    );
+  }
+
+  return depth;
+}
+
 const program = new Command()
   .name("sdv")
   .description("Run a local browser UI for semantic Git diffs")
   .version(packageJson.version)
   .option("-p, --port <number>", "server port", parsePort, 1555)
   .option("--host <host>", "server host", "127.0.0.1")
+  .option(
+    "--search-depth <depth>",
+    'repository search depth: 0 only checks cwd, 1 checks direct children, "unlimited" recurses without a cap',
+    parseSearchDepth,
+    "unlimited",
+  )
   .option("--no-open", "do not open the browser automatically")
   .showHelpAfterError()
   .parse();
@@ -73,15 +95,65 @@ if (semCheck.status !== 0) {
   process.exit(1);
 }
 
-const gitCheck = spawnSync("git", ["rev-parse", "--is-inside-work-tree"], {
+const gitVersionCheck = spawnSync("git", ["--version"], {
   cwd: repositoryDirectory,
   encoding: "utf8",
 });
 
-if (gitCheck.status !== 0 || gitCheck.stdout.trim() !== "true") {
-  console.error("sdv: run this command inside a Git repository");
+if (gitVersionCheck.status !== 0) {
+  console.error((gitVersionCheck.stderr || "sdv: unable to run git").trim());
   process.exit(1);
 }
+
+function isGitRepository(directory) {
+  const gitCheck = spawnSync("git", ["rev-parse", "--is-inside-work-tree"], {
+    cwd: directory,
+    encoding: "utf8",
+  });
+
+  return gitCheck.status === 0 && gitCheck.stdout.trim() === "true";
+}
+
+function getChildDirectories(directory) {
+  let entries;
+
+  try {
+    entries = readdirSync(directory, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  return entries
+    .filter((entry) => entry.isDirectory() && !entry.name.startsWith("."))
+    .map((entry) => path.join(directory, entry.name));
+}
+
+function hasGitRepositoryWithinDepth(directory, maxDepth, currentDepth = 0) {
+  if (isGitRepository(directory)) {
+    return true;
+  }
+
+  if (maxDepth !== "unlimited" && currentDepth >= maxDepth) {
+    return false;
+  }
+
+  return getChildDirectories(directory).some((childDirectory) =>
+    hasGitRepositoryWithinDepth(childDirectory, maxDepth, currentDepth + 1),
+  );
+}
+
+if (!hasGitRepositoryWithinDepth(repositoryDirectory, options.searchDepth)) {
+  console.error(
+    "sdv: no Git repositories found within the configured search depth",
+  );
+  process.exit(1);
+}
+
+const serverEnvironment = {
+  ...process.env,
+  SDV_WORKSPACE_CWD: repositoryDirectory,
+  SDV_SEARCH_DEPTH: String(options.searchDepth),
+};
 
 console.log(`Running on ${displayHost}:${options.port}`);
 
@@ -99,10 +171,7 @@ const server = spawn(
   {
     cwd: repositoryDirectory,
     detached: true,
-    env: {
-      ...process.env,
-      SDV_REPO_CWD: repositoryDirectory,
-    },
+    env: serverEnvironment,
     stdio: "inherit",
   },
 );

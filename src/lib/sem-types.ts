@@ -101,3 +101,26 @@ export type GitCommitsResult =
       ok: false;
       error: string;
     };
+
+export type WorkspaceRepository = {
+  id: string;
+  name: string;
+  relativePath: string;
+  branchName: string;
+  hasChanges: boolean;
+  changedFileCount: number;
+  error?: string;
+};
+
+export type WorkspaceRepositoriesResult =
+  | {
+      ok: true;
+      data: {
+        workspaceName: string;
+        repositories: WorkspaceRepository[];
+      };
+    }
+  | {
+      ok: false;
+      error: string;
+    };
