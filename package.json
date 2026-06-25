@@ -2,6 +2,9 @@
   "name": "sdv",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "bin": {
     "sdv": "./bin/sdv.mjs"
   },
@@ -17,6 +20,7 @@
     "@tanstack/react-query": "^5.101.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "commander": "^15.0.0",
     "lucide-react": "^1.17.0",
     "next": "16.2.7",
     "radix-ui": "^1.4.3",
