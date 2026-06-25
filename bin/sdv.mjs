@@ -3,6 +3,7 @@
 import { spawn, spawnSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
 import http from "node:http";
+import net from "node:net";
 import { constants as osConstants } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -154,6 +155,50 @@ const serverEnvironment = {
   SDV_WORKSPACE_CWD: repositoryDirectory,
   SDV_SEARCH_DEPTH: String(options.searchDepth),
 };
+
+function formatListenAddress(host, port) {
+  if (host === "127.0.0.1") {
+    return `localhost:${port}`;
+  }
+
+  return host.includes(":") ? `[${host}]:${port}` : `${host}:${port}`;
+}
+
+function checkPortAvailable(host, port) {
+  return new Promise((resolve, reject) => {
+    const probe = net.createServer();
+
+    probe.once("error", reject);
+    probe.listen({ host, port }, () => {
+      probe.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        resolve();
+      });
+    });
+  });
+}
+
+try {
+  await checkPortAvailable(options.host, options.port);
+} catch (error) {
+  const address = formatListenAddress(options.host, options.port);
+
+  if (error?.code === "EADDRINUSE") {
+    const suggestedPort = options.port === 65535 ? 65534 : options.port + 1;
+
+    console.error(`sdv: ${address} is already in use`);
+    console.error("Stop the existing process or choose another port:");
+    console.error(`  sdv --port ${suggestedPort}`);
+  } else {
+    console.error(`sdv: unable to listen on ${address}: ${error.message}`);
+  }
+
+  process.exit(1);
+}
 
 console.log(`Running on ${displayHost}:${options.port}`);
 
