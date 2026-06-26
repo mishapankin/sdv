@@ -712,7 +712,7 @@ function Sidebar({
       <ScrollArea className="min-h-0 flex-1">
         <nav aria-label="Changed semantic entities" className="py-2">
           {fileGroups.map((group) => (
-            <details key={group.filePath} open className="group/file mb-1">
+            <details key={group.filePath} className="group/file mb-1">
               <summary
                 className={cn(
                   "flex h-9 cursor-pointer list-none items-center gap-2 px-3 text-xs font-medium transition-colors select-none hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden",
@@ -1364,8 +1364,8 @@ export function SemanticDiffViewer() {
   return (
     <TooltipProvider>
       <div className="flex h-dvh min-h-[520px] flex-col overflow-hidden bg-background">
-        <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b bg-card px-4">
-          <div className="flex min-w-0 items-center gap-4">
+        <header className="flex h-14 shrink-0 items-center gap-4 overflow-x-auto border-b bg-card px-4">
+          <div className="flex min-w-0 shrink-0 items-center gap-4">
             <div className="flex items-center gap-2">
               <div className="flex size-7 items-center justify-center rounded-md bg-slate-950 text-white shadow-sm">
                 <GitCompareArrows className="size-4" />
@@ -1389,7 +1389,21 @@ export function SemanticDiffViewer() {
             ) : null}
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-max flex-1 items-center gap-3 border-l pl-4">
+            <div className="flex shrink-0 items-center gap-2 text-xs font-medium text-muted-foreground">
+              <GitCommitHorizontal className="size-4" />
+              Compare
+            </div>
+            <ComparisonSelector
+              key={getComparisonLabel(comparison)}
+              comparison={comparison}
+              commits={commitsQuery.data?.ok ? commitsQuery.data.data : []}
+              onModeChange={selectComparisonMode}
+              onCompare={compareCommits}
+            />
+          </div>
+
+          <div className="ml-auto flex shrink-0 items-center gap-3">
             {diff ? (
               <div className="hidden items-center gap-3 md:flex">
                 <SummaryStat
@@ -1456,20 +1470,6 @@ export function SemanticDiffViewer() {
             <ThemeToggle />
           </div>
         </header>
-
-        <div className="flex min-h-11 shrink-0 items-center gap-3 overflow-x-auto border-b bg-muted/30 px-4 py-2">
-          <div className="flex shrink-0 items-center gap-2 text-xs font-medium text-muted-foreground">
-            <GitCommitHorizontal className="size-4" />
-            Compare
-          </div>
-          <ComparisonSelector
-            key={getComparisonLabel(comparison)}
-            comparison={comparison}
-            commits={commitsQuery.data?.ok ? commitsQuery.data.data : []}
-            onModeChange={selectComparisonMode}
-            onCompare={compareCommits}
-          />
-        </div>
 
         <div className="flex min-h-0 flex-1">
           {repositoriesQuery.isPending ? <LoadingState /> : null}
