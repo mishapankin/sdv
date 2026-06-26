@@ -6,8 +6,9 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 # SDV Project
 
-SDV is a local-only semantic diff viewer. It is intentionally a thin browser UI
-over the `sem` CLI and should not grow unrelated source-control features.
+SDV is a local-only Git worktree diff viewer with semantic abilities. It should
+feel like a focused lazygit/VS Code diff interface: Git supplies repository and
+file status, while `sem` supplies semantic entity details where it can.
 
 ## Product Contract
 
@@ -17,19 +18,23 @@ over the `sem` CLI and should not grow unrelated source-control features.
 - It starts a local web server on `localhost:1555` and prints
   `Running on localhost:1555`.
 - It does not need to open a browser automatically.
-- The default comparison is unstaged tracked changes: `sem diff --verbose
-  --format json`.
+- The default comparison shows unstaged changes from `sem diff --verbose
+  --format json` plus untracked files from Git status.
 - The MVP supports unstaged changes, staged changes, and comparisons between
   two user-provided Git refs.
-- Refresh reruns `sem`; do not maintain a separate diff model or cache.
-- The sidebar is grouped by file. Each file lists its changed semantic entities
-  with a Lucide icon for entity type and a label/icon for change type such as
-  added, modified, deleted, moved, renamed, or reordered.
-- Untracked files follow `sem` behavior and are excluded.
+- Refresh reruns `sem` and refreshes Git file status; do not maintain a
+  separate diff cache.
+- The sidebar is grouped by file. Files with semantic changes list their changed
+  semantic entities with a Lucide icon for entity type and a label/icon for
+  change type such as added, modified, deleted, moved, renamed, or reordered.
+- Untracked files are shown for the default unstaged comparison as file-level
+  Git changes. They do not have semantic entities unless `sem` returns them.
 - macOS and Linux are the supported platforms for the MVP.
 - Assume the `sem` binary is available through `PATH`. If it is missing, print
   a clear error to stdout and exit without starting the web server.
-- Treat `sem` JSON as the source of truth. Keep any transformation limited to
+- Treat `sem` JSON as the source of truth for semantic entities. Treat Git
+  status/diff output as the source of truth for repository dirty state,
+  untracked files, and full-file diffs. Keep transformations limited to
   validation and view-model grouping.
 
 ## Tech Stack
@@ -64,8 +69,8 @@ layer, database, authentication system, or Git abstraction.
 - Validate comparison inputs and constrain them to the supported modes before
   building `sem` arguments.
 - Return only serializable, UI-required data from Server Functions.
-- Use a single TanStack Query query for the active semantic diff. A refresh is
-  query invalidation/refetch.
+- Use a single TanStack Query query for the active diff. A refresh is query
+  invalidation/refetch.
 - Prefer derived state and avoid scattered `useState` calls.
 - Keep Server Components as the default and add Client Components only around
   interactive controls and query-driven views.

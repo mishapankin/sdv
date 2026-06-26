@@ -63,6 +63,8 @@ import {
 import type {
   ChangeType,
   Comparison,
+  FileOnlyChange,
+  FileStatus,
   GitCommit,
   SemanticChange,
   WorkspaceRepository,
@@ -111,6 +113,8 @@ const changeStyles: Record<
       "border-cyan-200 bg-cyan-50 text-cyan-700 dark:border-cyan-800 dark:bg-cyan-950 dark:text-cyan-300",
   },
 };
+
+const EMPTY_FILE_CHANGES: FileOnlyChange[] = [];
 
 function getComparisonFromSearchParams(
   searchParams: Pick<URLSearchParams, "get">,
@@ -255,25 +259,116 @@ function ComparisonSelector({
   );
 }
 
-function groupByFile(changes: SemanticChange[]) {
-  const groups = new Map<string, SemanticChange[]>();
+type FileGroup = {
+  filePath: string;
+  oldFilePath: string | null;
+  changeType: ChangeType;
+  changes: SemanticChange[];
+  fileChange?: FileOnlyChange;
+};
+
+function groupByFile(
+  changes: SemanticChange[],
+  fileChanges: FileOnlyChange[] = [],
+): FileGroup[] {
+  const groups = new Map<
+    string,
+    { changes: SemanticChange[]; fileChange?: FileOnlyChange }
+  >();
 
   for (const change of changes) {
-    const current = groups.get(change.filePath) ?? [];
-    current.push(change);
+    const current = groups.get(change.filePath) ?? { changes: [] };
+    current.changes.push(change);
     groups.set(change.filePath, current);
+  }
+
+  for (const fileChange of fileChanges) {
+    const current = groups.get(fileChange.filePath) ?? { changes: [] };
+    current.fileChange = fileChange;
+    groups.set(fileChange.filePath, current);
   }
 
   return [...groups.entries()]
     .sort(([left], [right]) => left.localeCompare(right))
-    .map(([filePath, fileChanges]) => ({
+    .map(([filePath, group]) => ({
       filePath,
-      changes: fileChanges.sort((left, right) => {
+      oldFilePath:
+        getFileOldPath(filePath, group.changes) ??
+        group.fileChange?.oldFilePath ??
+        null,
+      changeType: getFileChangeType(
+        filePath,
+        group.changes,
+        group.fileChange,
+      ),
+      changes: group.changes.sort((left, right) => {
         const leftLine = left.startLine ?? left.oldStartLine ?? 0;
         const rightLine = right.startLine ?? right.oldStartLine ?? 0;
         return leftLine - rightLine;
       }),
+      fileChange: group.fileChange,
     }));
+}
+
+function getFileOldPath(filePath: string, changes: SemanticChange[]) {
+  const oldPath = changes.find(
+    (change) => change.oldFilePath && change.oldFilePath !== filePath,
+  )?.oldFilePath;
+
+  return oldPath ?? null;
+}
+
+function getFileChangeType(
+  filePath: string,
+  changes: SemanticChange[],
+  fileChange?: FileOnlyChange,
+): ChangeType {
+  if (!changes.length && fileChange) {
+    return getChangeTypeFromFileStatus(fileChange.fileStatus);
+  }
+
+  const changeTypes = new Set(changes.map((change) => change.changeType));
+
+  if (changeTypes.size === 1) {
+    const [changeType] = changeTypes;
+
+    if (changeType === "added" || changeType === "deleted") {
+      return changeType;
+    }
+  }
+
+  if (
+    changes.some(
+      (change) => change.oldFilePath && change.oldFilePath !== filePath,
+    )
+  ) {
+    return "renamed";
+  }
+
+  return "modified";
+}
+
+function getChangeTypeFromFileStatus(fileStatus: FileStatus): ChangeType {
+  if (fileStatus === "added" || fileStatus === "deleted") {
+    return fileStatus;
+  }
+
+  if (fileStatus === "renamed") {
+    return "renamed";
+  }
+
+  return "modified";
+}
+
+function hasFileInDiff(
+  filePath: string,
+  changes: SemanticChange[],
+  fileChanges: FileOnlyChange[],
+) {
+  return (
+    changes.some((change) => change.filePath === filePath) ||
+    fileChanges.some((change) => change.filePath === filePath)
+  );
 }
 
 function createEntityFileDiff(
@@ -452,7 +547,7 @@ function RepositoryRail({
                   title={
                     repo.error
                       ? repo.error
-                      : `${repo.changedFileCount} changed tracked files`
+                      : `${repo.changedFileCount} changed files`
                   }
                 >
                   {repo.error ? "!" : repo.changedFileCount}
@@ -577,18 +672,23 @@ function HunkNavigation({
 
 function Sidebar({
   changes,
+  fileChanges,
   selectedEntityId,
   selectedFilePath,
   onSelectEntity,
   onSelectFile,
 }: {
   changes: SemanticChange[];
+  fileChanges: FileOnlyChange[];
   selectedEntityId?: string;
   selectedFilePath?: string;
   onSelectEntity: (entityId: string) => void;
   onSelectFile: (filePath: string) => void;
 }) {
-  const fileGroups = useMemo(() => groupByFile(changes), [changes]);
+  const fileGroups = useMemo(
+    () => groupByFile(changes, fileChanges),
+    [changes, fileChanges],
+  );
 
   return (
     <aside className="flex h-full min-w-0 flex-col bg-sidebar">
@@ -622,16 +722,29 @@ function Sidebar({
               >
                 <ChevronDown className="size-3.5 shrink-0 -rotate-90 text-muted-foreground transition-transform group-open/file:rotate-0" />
                 <FileCode2 className="size-3.5 shrink-0 text-muted-foreground" />
+                <ChangeBadge changeType={group.changeType} />
                 <button
                   type="button"
                   className="min-w-0 flex-1 truncate text-left hover:underline hover:underline-offset-2 focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-                  title={`View full diff for ${group.filePath}`}
+                  title={
+                    group.oldFilePath
+                      ? `View full diff for ${group.oldFilePath} → ${group.filePath}`
+                      : `View full diff for ${group.filePath}`
+                  }
                   onClick={(event) => {
                     event.preventDefault();
                     event.stopPropagation();
                     onSelectFile(group.filePath);
                   }}
                 >
+                  {group.oldFilePath ? (
+                    <>
+                      <span className="text-muted-foreground">
+                        {group.oldFilePath}
+                      </span>{" "}
+                      <span aria-hidden="true">→</span>{" "}
+                    </>
+                  ) : null}
                   {group.filePath}
                 </button>
                 <span className="font-mono text-[10px] text-muted-foreground">
@@ -639,6 +752,38 @@ function Sidebar({
                 </span>
               </summary>
               <div className="space-y-0.5 pr-1.5 pl-12">
+                {group.fileChange && group.changes.length === 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => onSelectFile(group.filePath)}
+                    className={cn(
+                      "group flex w-full items-center gap-2 rounded-md border border-transparent px-2 py-2 text-left transition-colors",
+                      selectedFilePath === group.filePath
+                        ? "border-border bg-card shadow-xs"
+                        : "hover:bg-sidebar-accent",
+                    )}
+                  >
+                    <FileCode2
+                      className={cn(
+                        "size-4 shrink-0",
+                        selectedFilePath === group.filePath
+                          ? "text-foreground"
+                          : "text-muted-foreground",
+                      )}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[13px] font-medium">
+                        {group.fileChange.changeType === "binary"
+                          ? "Binary file"
+                          : "Untracked file"}
+                      </span>
+                      <span className="block truncate font-mono text-[10px] text-muted-foreground">
+                        {group.fileChange.fileStatus}
+                      </span>
+                    </span>
+                    <ChangeBadge changeType={group.changeType} />
+                  </button>
+                ) : null}
                 {group.changes.map((change) => (
                   <button
                     key={change.entityId}
@@ -942,7 +1087,7 @@ function ErrorState({
   error,
   onRetry,
   isFetching,
-  title = "Unable to run semantic diff",
+  title = "Unable to run diff",
 }: {
   error: string;
   onRetry: () => void;
@@ -1062,9 +1207,14 @@ export function SemanticDiffViewer() {
         : [],
     [diff, mergeModuleChanges],
   );
+  const visibleFileChanges = diff?.fileChanges ?? EMPTY_FILE_CHANGES;
+  const fileGroups = useMemo(
+    () => groupByFile(visibleChanges, visibleFileChanges),
+    [visibleChanges, visibleFileChanges],
+  );
   const navigableChanges = useMemo(
-    () => groupByFile(visibleChanges).flatMap((group) => group.changes),
-    [visibleChanges],
+    () => fileGroups.flatMap((group) => group.changes),
+    [fileGroups],
   );
   const selectedChange =
     selectedFilePath === undefined
@@ -1073,17 +1223,21 @@ export function SemanticDiffViewer() {
         ) ?? navigableChanges[0])
       : undefined;
   const selectedEntityId = selectedChange?.entityId;
+  const effectiveSelectedFilePath =
+    selectedFilePath ??
+    (selectedChange === undefined ? fileGroups[0]?.filePath : undefined);
   const selectedEntityIndex = selectedChange
     ? navigableChanges.findIndex(
         (change) => change.entityId === selectedChange.entityId,
       )
     : -1;
   const fileQuery = useQuery({
-    queryKey: ["file-diff", activeRepoId, comparison, selectedFilePath],
-    queryFn: () => getFileDiff(selectedFilePath!, comparison, activeRepoId),
+    queryKey: ["file-diff", activeRepoId, comparison, effectiveSelectedFilePath],
+    queryFn: () =>
+      getFileDiff(effectiveSelectedFilePath!, comparison, activeRepoId),
     enabled:
       activeRepoId !== undefined &&
-      selectedFilePath !== undefined &&
+      effectiveSelectedFilePath !== undefined &&
       diff !== undefined,
   });
   const isRefreshing =
@@ -1179,12 +1333,16 @@ export function SemanticDiffViewer() {
 
   async function refreshDiff() {
     const refreshed = await query.refetch();
+    const filePathToRefresh = effectiveSelectedFilePath;
 
-    if (selectedFilePath) {
+    if (filePathToRefresh) {
       if (
+        selectedFilePath &&
         refreshed.data?.ok &&
-        !refreshed.data.data.changes.some(
-          (change) => change.filePath === selectedFilePath,
+        !hasFileInDiff(
+          filePathToRefresh,
+          refreshed.data.data.changes,
+          refreshed.data.data.fileChanges,
         )
       ) {
         const params = new URLSearchParams(searchParams.toString());
@@ -1286,14 +1444,14 @@ export function SemanticDiffViewer() {
                 <Button
                   size="icon"
                   variant="outline"
-                  aria-label="Refresh semantic diff"
+                  aria-label="Refresh diff"
                   onClick={refreshDiff}
                   disabled={isRefreshing}
                 >
                   <RefreshCw className={cn(isRefreshing && "animate-spin")} />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Rerun sem diff</TooltipContent>
+              <TooltipContent>Refresh diff</TooltipContent>
             </Tooltip>
             <ThemeToggle />
           </div>
@@ -1347,12 +1505,12 @@ export function SemanticDiffViewer() {
                     isFetching={query.isFetching}
                   />
                 ) : null}
-                {diff && visibleChanges.length === 0 ? (
+                {diff && fileGroups.length === 0 ? (
                   <EmptyState comparison={comparison} />
                 ) : null}
                 {diff &&
-                visibleChanges.length > 0 &&
-                (selectedFilePath || selectedChange) ? (
+                fileGroups.length > 0 &&
+                (effectiveSelectedFilePath || selectedChange) ? (
                   <ResizablePanelGroup orientation="horizontal">
                     <ResizablePanel
                       defaultSize="27%"
@@ -1361,18 +1519,19 @@ export function SemanticDiffViewer() {
                     >
                       <Sidebar
                         changes={visibleChanges}
+                        fileChanges={visibleFileChanges}
                         selectedEntityId={selectedEntityId}
-                        selectedFilePath={selectedFilePath}
+                        selectedFilePath={effectiveSelectedFilePath}
                         onSelectEntity={selectEntity}
                         onSelectFile={selectFile}
                       />
                     </ResizablePanel>
                     <ResizableHandle />
                     <ResizablePanel defaultSize="73%" minSize="480px">
-                      {selectedFilePath && fileQuery.isPending ? (
+                      {effectiveSelectedFilePath && fileQuery.isPending ? (
                         <LoadingState />
                       ) : null}
-                      {selectedFilePath &&
+                      {effectiveSelectedFilePath &&
                       fileQuery.data &&
                       !fileQuery.data.ok ? (
                         <ErrorState
@@ -1382,7 +1541,7 @@ export function SemanticDiffViewer() {
                           title="Unable to load file diff"
                         />
                       ) : null}
-                      {selectedFilePath && fileQuery.data?.ok ? (
+                      {effectiveSelectedFilePath && fileQuery.data?.ok ? (
                         <FileDiffView
                           key={`${fileQuery.data.data.filePath}:${fileQuery.data.data.patch}`}
                           filePath={fileQuery.data.data.filePath}

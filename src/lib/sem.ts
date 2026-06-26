@@ -6,6 +6,7 @@ import { promisify } from "node:util";
 
 import {
   type Comparison,
+  type FileOnlyChange,
   semDiffSchema,
   type FileDiffResult,
   type GitCommitsResult,
@@ -21,6 +22,16 @@ async function run(command: string, args: string[], cwd: string) {
     encoding: "utf8",
     maxBuffer: 20 * 1024 * 1024,
   });
+}
+
+type ExecFileError = Error & {
+  code?: number | string;
+  stdout?: string;
+  stderr?: string;
+};
+
+function isExecFileError(error: unknown): error is ExecFileError {
+  return typeof error === "object" && error !== null;
 }
 
 function getProcessError(error: unknown) {
@@ -65,17 +76,73 @@ function getGitDiffArgs(comparison: Comparison) {
   return ["diff"];
 }
 
+async function readUntrackedFiles(cwd: string) {
+  const { stdout } = await run(
+    "git",
+    ["ls-files", "--others", "--exclude-standard", "-z"],
+    cwd,
+  );
+
+  return stdout.split("\0").filter(Boolean);
+}
+
+async function readUntrackedFileChanges(cwd: string): Promise<FileOnlyChange[]> {
+  const files = await readUntrackedFiles(cwd);
+
+  return files.map((filePath) => ({
+    changeType: "untracked" as const,
+    filePath,
+    oldFilePath: null,
+    fileStatus: "added" as const,
+  }));
+}
+
+async function readUntrackedFilePatch(filePath: string, cwd: string) {
+  try {
+    const { stdout } = await run(
+      "git",
+      [
+        "diff",
+        "--no-index",
+        "--no-ext-diff",
+        "--no-color",
+        "--",
+        "/dev/null",
+        filePath,
+      ],
+      cwd,
+    );
+
+    return stdout;
+  } catch (error) {
+    if (
+      isExecFileError(error) &&
+      error.code === 1 &&
+      typeof error.stdout === "string"
+    ) {
+      return error.stdout;
+    }
+
+    throw error;
+  }
+}
+
 export async function readSemanticDiff(
   comparison: Comparison,
   repoId?: string,
 ): Promise<SemanticDiffResult> {
   try {
     const cwd = await resolveRepositoryDirectory(repoId);
-    const [{ stdout }, branchResult, rootResult] = await Promise.all([
-      run("sem", getSemDiffArgs(comparison), cwd),
-      run("git", ["branch", "--show-current"], cwd),
-      run("git", ["rev-parse", "--show-toplevel"], cwd),
-    ]);
+    const shouldIncludeUntracked = comparison.mode === "unstaged";
+    const [{ stdout }, branchResult, rootResult, untrackedChanges] =
+      await Promise.all([
+        run("sem", getSemDiffArgs(comparison), cwd),
+        run("git", ["branch", "--show-current"], cwd),
+        run("git", ["rev-parse", "--show-toplevel"], cwd),
+        shouldIncludeUntracked
+          ? readUntrackedFileChanges(cwd)
+          : Promise.resolve([]),
+      ]);
     let json: unknown;
 
     try {
@@ -104,6 +171,11 @@ export async function readSemanticDiff(
       ok: true,
       data: {
         ...parsed.data,
+        fileChanges: [
+          ...parsed.data.fileChanges,
+          ...parsed.data.binaryChanges,
+          ...untrackedChanges,
+        ],
         repositoryName: path.basename(rootResult.stdout.trim()),
         branchName: branchResult.stdout.trim() || "detached HEAD",
         refreshedAt: new Date().toISOString(),
@@ -129,14 +201,34 @@ export async function readFileDiff(
 
   try {
     const cwd = await resolveRepositoryDirectory(repoId);
-    const { stdout: changedFilesOutput } = await run(
-      "git",
-      [...diffArgs, "--name-only", "-z"],
-      cwd,
-    );
+    const [changedFilesResult, untrackedFiles] = await Promise.all([
+      run("git", [...diffArgs, "--name-only", "-z"], cwd),
+      comparison.mode === "unstaged"
+        ? readUntrackedFiles(cwd)
+        : Promise.resolve([]),
+    ]);
     const changedFiles = new Set(
-      changedFilesOutput.split("\0").filter(Boolean),
+      changedFilesResult.stdout.split("\0").filter(Boolean),
     );
+    const untrackedFileSet = new Set(untrackedFiles);
+
+    if (untrackedFileSet.has(filePath)) {
+      const patch = await readUntrackedFilePatch(filePath, cwd);
+
+      if (!patch.trim()) {
+        const message = `git returned no diff for: ${filePath}`;
+        reportError(message);
+        return { ok: false, error: message };
+      }
+
+      return {
+        ok: true,
+        data: {
+          filePath,
+          patch,
+        },
+      };
+    }
 
     if (!changedFiles.has(filePath)) {
       const message = `file is not part of the selected comparison: ${filePath}`;

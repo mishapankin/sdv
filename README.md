@@ -1,7 +1,7 @@
 # Semantic Diff Viewer
 
-A local browser UI for entity-level diffs produced by
-[`sem`](https://github.com/ataraxy-labs/sem).
+A local browser UI for Git worktree diffs with entity-level semantic details
+from [`sem`](https://github.com/ataraxy-labs/sem).
 
 ## Requirements
 
@@ -29,15 +29,16 @@ sdv
 You can also run SDV from a folder containing multiple Git repositories. By
 default, SDV searches recursively without a depth limit and stops descending
 once it finds a repository. The repository list shows changed repositories
-first, including the number of changed tracked files. Select a repository to
-open the same semantic diff viewer for that repo, and use Refresh all to update
-the repository list.
+first, including the number of changed files. Select a repository to open the
+same diff viewer for that repo, and use Refresh all to update the repository
+list.
 
 The server starts at `http://127.0.0.1:1555`, opens it in the default browser,
-and displays semantic entities from
-tracked, unstaged changes by default. The comparison bar can switch to staged
-changes or compare two Git refs such as `HEAD~3` and `HEAD`. Recent commits are
-offered as searchable suggestions, and arbitrary valid refs are accepted.
+and displays semantic entities from unstaged changes by default. The default
+view also includes untracked files as file-level Git changes. The comparison bar
+can switch to staged changes or compare two Git refs such as `HEAD~3` and
+`HEAD`. Recent commits are offered as searchable suggestions, and arbitrary
+valid refs are accepted.
 
 Use the refresh button to rerun the active comparison. The default command is:
 
@@ -45,7 +46,8 @@ Use the refresh button to rerun the active comparison. The default command is:
 sem diff --verbose --format json
 ```
 
-Untracked files are excluded, matching `sem` and Git behavior.
+`sem` remains the source of truth for semantic entities. Git status/diff output
+is used for repository dirty state, untracked files, and full-file diffs.
 
 ## CLI options
 

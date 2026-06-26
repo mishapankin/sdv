@@ -93,7 +93,7 @@ async function readRepositoryStatus(
   try {
     const [branchResult, statusResult] = await Promise.all([
       run("git", ["branch", "--show-current"], directory),
-      run("git", ["status", "--porcelain=v1", "-uno"], directory),
+      run("git", ["status", "--porcelain=v1"], directory),
     ]);
     const changedFileCount = parseChangedFileCount(statusResult.stdout);
 

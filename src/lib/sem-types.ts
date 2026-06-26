@@ -21,6 +21,13 @@ export const changeTypeSchema = z.enum([
   "reordered",
 ]);
 
+export const fileStatusSchema = z.enum([
+  "added",
+  "modified",
+  "deleted",
+  "renamed",
+]);
+
 export const semanticChangeSchema = z.object({
   entityId: z.string(),
   changeType: changeTypeSchema,
@@ -38,6 +45,20 @@ export const semanticChangeSchema = z.object({
   structuralChange: z.boolean().nullable().optional(),
 });
 
+export const binaryChangeSchema = z.object({
+  changeType: z.literal("binary"),
+  filePath: z.string(),
+  oldFilePath: z.string().nullable().optional(),
+  fileStatus: fileStatusSchema,
+});
+
+export const fileOnlyChangeSchema = z.object({
+  changeType: z.enum(["binary", "untracked"]),
+  filePath: z.string(),
+  oldFilePath: z.string().nullable().optional(),
+  fileStatus: fileStatusSchema,
+});
+
 export const semDiffSchema = z.object({
   summary: z.object({
     fileCount: z.number().int().nonnegative(),
@@ -47,14 +68,20 @@ export const semDiffSchema = z.object({
     moved: z.number().int().nonnegative(),
     renamed: z.number().int().nonnegative(),
     reordered: z.number().int().nonnegative(),
+    binary: z.number().int().nonnegative().optional(),
     orphan: z.number().int().nonnegative(),
     total: z.number().int().nonnegative(),
   }),
   changes: z.array(semanticChangeSchema),
+  binaryChanges: z.array(binaryChangeSchema).default([]),
+  fileChanges: z.array(fileOnlyChangeSchema).default([]),
 });
 
 export type ChangeType = z.infer<typeof changeTypeSchema>;
+export type FileStatus = z.infer<typeof fileStatusSchema>;
 export type SemanticChange = z.infer<typeof semanticChangeSchema>;
+export type BinaryChange = z.infer<typeof binaryChangeSchema>;
+export type FileOnlyChange = z.infer<typeof fileOnlyChangeSchema>;
 export type SemDiff = z.infer<typeof semDiffSchema>;
 
 export type SemanticDiffResult =
