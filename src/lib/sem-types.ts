@@ -103,7 +103,10 @@ export type FileDiffResult =
       ok: true;
       data: {
         filePath: string;
-        patch: string;
+        oldFilePath: string;
+        oldContent: string;
+        newContent: string;
+        cacheKey: string;
       };
     }
   | {

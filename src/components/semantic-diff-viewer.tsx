@@ -1,11 +1,10 @@
 "use client";
 
 import {
-  getSingularPatch,
   parseDiffFromFile,
   type FileDiffMetadata,
 } from "@pierre/diffs";
-import { FileDiff, PatchDiff } from "@pierre/diffs/react";
+import { FileDiff } from "@pierre/diffs/react";
 import { useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
@@ -46,7 +45,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
@@ -670,6 +669,194 @@ function HunkNavigation({
   );
 }
 
+type DiffPaneMetrics = {
+  deletionClientWidth: number;
+  deletionScrollWidth: number;
+  additionClientWidth: number;
+  additionScrollWidth: number;
+};
+
+const EMPTY_DIFF_PANE_METRICS: DiffPaneMetrics = {
+  deletionClientWidth: 0,
+  deletionScrollWidth: 0,
+  additionClientWidth: 0,
+  additionScrollWidth: 0,
+};
+
+function findDiffScrollPanes(diffRoot: HTMLDivElement | null) {
+  const diffContainer = diffRoot?.querySelector<HTMLElement>("diffs-container");
+  const shadowRoot = diffContainer?.shadowRoot;
+
+  if (!shadowRoot) return null;
+
+  const deletionPane = shadowRoot.querySelector<HTMLElement>("[data-deletions]");
+  const additionPane = shadowRoot.querySelector<HTMLElement>("[data-additions]");
+
+  if (!deletionPane || !additionPane) return null;
+
+  return { deletionPane, additionPane };
+}
+
+function DiffHorizontalScrollbars({
+  diffRootRef,
+  syncKey,
+}: {
+  diffRootRef: React.RefObject<HTMLDivElement | null>;
+  syncKey: string;
+}) {
+  const deletionProxyRef = useRef<HTMLDivElement>(null);
+  const additionProxyRef = useRef<HTMLDivElement>(null);
+  const [metrics, setMetrics] = useState<DiffPaneMetrics>(
+    EMPTY_DIFF_PANE_METRICS,
+  );
+  const hasDeletionOverflow =
+    metrics.deletionScrollWidth > metrics.deletionClientWidth + 1;
+  const hasAdditionOverflow =
+    metrics.additionScrollWidth > metrics.additionClientWidth + 1;
+  const hasOverflow = hasDeletionOverflow || hasAdditionOverflow;
+
+  useEffect(() => {
+    let rafId = 0;
+    let attempts = 0;
+    let cleanup = () => {};
+
+    function connect() {
+      const panes = findDiffScrollPanes(diffRootRef.current);
+
+      if (!panes) {
+        attempts += 1;
+
+        if (attempts < 60) {
+          rafId = window.requestAnimationFrame(connect);
+        }
+
+        return;
+      }
+
+      const { deletionPane, additionPane } = panes;
+      if (!deletionProxyRef.current || !additionProxyRef.current) return;
+
+      const deletionProxy = deletionProxyRef.current;
+      const additionProxy = additionProxyRef.current;
+
+      let isSyncing = false;
+
+      function updateMetrics() {
+        setMetrics({
+          deletionClientWidth: deletionPane.clientWidth,
+          deletionScrollWidth: deletionPane.scrollWidth,
+          additionClientWidth: additionPane.clientWidth,
+          additionScrollWidth: additionPane.scrollWidth,
+        });
+      }
+
+      function syncProxyFromPane(pane: HTMLElement, proxy: HTMLDivElement) {
+        if (Math.abs(proxy.scrollLeft - pane.scrollLeft) > 1) {
+          proxy.scrollLeft = pane.scrollLeft;
+        }
+      }
+
+      function syncPaneFromProxy(proxy: HTMLDivElement, pane: HTMLElement) {
+        if (Math.abs(pane.scrollLeft - proxy.scrollLeft) > 1) {
+          pane.scrollLeft = proxy.scrollLeft;
+        }
+      }
+
+      function handlePaneScroll() {
+        if (isSyncing) return;
+        isSyncing = true;
+        syncProxyFromPane(deletionPane, deletionProxy);
+        syncProxyFromPane(additionPane, additionProxy);
+        isSyncing = false;
+      }
+
+      function handleDeletionProxyScroll() {
+        if (isSyncing) return;
+        isSyncing = true;
+        syncPaneFromProxy(deletionProxy, deletionPane);
+        isSyncing = false;
+      }
+
+      function handleAdditionProxyScroll() {
+        if (isSyncing) return;
+        isSyncing = true;
+        syncPaneFromProxy(additionProxy, additionPane);
+        isSyncing = false;
+      }
+
+      const resizeObserver = new ResizeObserver(updateMetrics);
+      resizeObserver.observe(deletionPane);
+      resizeObserver.observe(additionPane);
+      deletionPane.addEventListener("scroll", handlePaneScroll, {
+        passive: true,
+      });
+      additionPane.addEventListener("scroll", handlePaneScroll, {
+        passive: true,
+      });
+      deletionProxy.addEventListener("scroll", handleDeletionProxyScroll, {
+        passive: true,
+      });
+      additionProxy.addEventListener("scroll", handleAdditionProxyScroll, {
+        passive: true,
+      });
+      updateMetrics();
+      handlePaneScroll();
+
+      cleanup = () => {
+        resizeObserver.disconnect();
+        deletionPane.removeEventListener("scroll", handlePaneScroll);
+        additionPane.removeEventListener("scroll", handlePaneScroll);
+        deletionProxy.removeEventListener("scroll", handleDeletionProxyScroll);
+        additionProxy.removeEventListener("scroll", handleAdditionProxyScroll);
+      };
+    }
+
+    rafId = window.requestAnimationFrame(connect);
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      cleanup();
+    };
+  }, [diffRootRef, syncKey]);
+
+  return (
+    <div
+      className={cn(
+        "sticky bottom-0 z-10 mt-2 grid grid-cols-2 gap-px rounded-md border bg-card/95 p-1 shadow-sm backdrop-blur",
+        !hasOverflow &&
+          "pointer-events-none mt-0 h-0 overflow-hidden border-transparent p-0 opacity-0",
+      )}
+    >
+      <div
+        ref={deletionProxyRef}
+        aria-label="Scroll previous version horizontally"
+        className={cn(
+          "h-3 overflow-x-auto overflow-y-hidden",
+          !hasDeletionOverflow && "invisible",
+        )}
+      >
+        <div
+          className="h-px"
+          style={{ width: metrics.deletionScrollWidth }}
+        />
+      </div>
+      <div
+        ref={additionProxyRef}
+        aria-label="Scroll current version horizontally"
+        className={cn(
+          "h-3 overflow-x-auto overflow-y-hidden",
+          !hasAdditionOverflow && "invisible",
+        )}
+      >
+        <div
+          className="h-px"
+          style={{ width: metrics.additionScrollWidth }}
+        />
+      </div>
+    </div>
+  );
+}
+
 function Sidebar({
   changes,
   fileChanges,
@@ -948,7 +1135,7 @@ function EntityDiff({
       </div>
 
       <ScrollArea className="min-h-0 flex-1">
-        <div className="min-w-[720px] p-5">
+        <div className="p-5">
           <div
             ref={diffRootRef}
             className="overflow-hidden rounded-lg border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
@@ -966,8 +1153,11 @@ function EntityDiff({
               disableWorkerPool
             />
           </div>
+          <DiffHorizontalScrollbars
+            diffRootRef={diffRootRef}
+            syncKey={`${change.entityId}:${renderVersion}`}
+          />
         </div>
-        <ScrollBar orientation="horizontal" />
       </ScrollArea>
     </main>
   );
@@ -975,18 +1165,45 @@ function EntityDiff({
 
 function FileDiffView({
   filePath,
-  patch,
+  oldFilePath,
+  oldContent,
+  newContent,
+  cacheKey,
   theme,
   comparison,
 }: {
   filePath: string;
-  patch: string;
+  oldFilePath: string;
+  oldContent: string;
+  newContent: string;
+  cacheKey: string;
   theme: "light" | "dark";
   comparison: Comparison;
 }) {
-  const fileDiff = useMemo(() => getSingularPatch(patch), [patch]);
+  const fileDiff = useMemo(
+    () => {
+      if (oldContent === newContent) {
+        return null;
+      }
+
+      return parseDiffFromFile(
+        {
+          name: oldFilePath,
+          contents: oldContent,
+          cacheKey: `${cacheKey}:old`,
+        },
+        {
+          name: filePath,
+          contents: newContent,
+          cacheKey: `${cacheKey}:new`,
+        },
+        { context: 3 },
+      );
+    },
+    [cacheKey, filePath, newContent, oldContent, oldFilePath],
+  );
   const diffRootRef = useRef<HTMLDivElement>(null);
-  const hunkNavigation = useHunkNavigation(fileDiff.hunks, diffRootRef);
+  const hunkNavigation = useHunkNavigation(fileDiff?.hunks ?? [], diffRootRef);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -1035,32 +1252,43 @@ function FileDiffView({
           </p>
         </div>
         <HunkNavigation
-          hunks={fileDiff.hunks}
+          hunks={fileDiff?.hunks ?? []}
           {...hunkNavigation}
         />
       </div>
 
       <ScrollArea className="min-h-0 flex-1">
-        <div className="min-w-[720px] p-5">
-          <div
-            ref={diffRootRef}
-            className="overflow-hidden rounded-lg border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
-          >
-            <PatchDiff
-              patch={patch}
-              options={{
-                diffStyle: "split",
-                diffIndicators: "bars",
-                lineDiffType: "word-alt",
-                theme: theme === "dark" ? "pierre-dark" : "pierre-light",
-                overflow: "scroll",
-                disableFileHeader: true,
-              }}
-              disableWorkerPool
-            />
-          </div>
+        <div className="p-5">
+          {fileDiff ? (
+            <>
+              <div
+                ref={diffRootRef}
+                className="overflow-hidden rounded-lg border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
+              >
+                <FileDiff
+                  fileDiff={fileDiff}
+                  options={{
+                    diffStyle: "split",
+                    diffIndicators: "bars",
+                    lineDiffType: "word-alt",
+                    theme: theme === "dark" ? "pierre-dark" : "pierre-light",
+                    overflow: "scroll",
+                    disableFileHeader: true,
+                  }}
+                  disableWorkerPool
+                />
+              </div>
+              <DiffHorizontalScrollbars
+                diffRootRef={diffRootRef}
+                syncKey={cacheKey}
+              />
+            </>
+          ) : (
+            <div className="rounded-lg border bg-card p-6 text-sm text-muted-foreground">
+              No line changes in this file for {getComparisonLabel(comparison).toLowerCase()}.
+            </div>
+          )}
         </div>
-        <ScrollBar orientation="horizontal" />
       </ScrollArea>
     </main>
   );
@@ -1543,9 +1771,12 @@ export function SemanticDiffViewer() {
                       ) : null}
                       {effectiveSelectedFilePath && fileQuery.data?.ok ? (
                         <FileDiffView
-                          key={`${fileQuery.data.data.filePath}:${fileQuery.data.data.patch}`}
+                          key={fileQuery.data.data.cacheKey}
                           filePath={fileQuery.data.data.filePath}
-                          patch={fileQuery.data.data.patch}
+                          oldFilePath={fileQuery.data.data.oldFilePath}
+                          oldContent={fileQuery.data.data.oldContent}
+                          newContent={fileQuery.data.data.newContent}
+                          cacheKey={fileQuery.data.data.cacheKey}
                           theme={theme}
                           comparison={comparison}
                         />
