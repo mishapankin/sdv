@@ -11,7 +11,6 @@ import {
   ArrowDown,
   ArrowRight,
   ArrowUp,
-  ChevronDown,
   CirclePlus,
   FileCode2,
   FolderGit2,
@@ -35,7 +34,9 @@ import {
   getSemanticDiff,
   getWorkspaceRepositories,
 } from "@/app/actions";
+import { changeStyles } from "@/components/change-badge";
 import { EntityIcon } from "@/components/entity-icons";
+import { FileTree } from "@/components/file-tree";
 import { ThemeToggle, useTheme } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -60,7 +61,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type {
-  ChangeType,
   Comparison,
   FileOnlyChange,
   GitCommit,
@@ -70,48 +70,6 @@ import type {
 import { groupByFile, hasFileInDiff } from "@/lib/group-changes";
 import { mergeModuleLevelChanges } from "@/lib/merge-module-changes";
 import { cn } from "@/lib/utils";
-
-const changeStyles: Record<
-  ChangeType,
-  { label: string; shortLabel: string; className: string }
-> = {
-  added: {
-    label: "Added",
-    shortLabel: "A",
-    className:
-      "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
-  },
-  modified: {
-    label: "Modified",
-    shortLabel: "M",
-    className:
-      "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300",
-  },
-  deleted: {
-    label: "Deleted",
-    shortLabel: "D",
-    className:
-      "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-300",
-  },
-  moved: {
-    label: "Moved",
-    shortLabel: "V",
-    className:
-      "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300",
-  },
-  renamed: {
-    label: "Renamed",
-    shortLabel: "R",
-    className:
-      "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950 dark:text-violet-300",
-  },
-  reordered: {
-    label: "Reordered",
-    shortLabel: "O",
-    className:
-      "border-cyan-200 bg-cyan-50 text-cyan-700 dark:border-cyan-800 dark:bg-cyan-950 dark:text-cyan-300",
-  },
-};
 
 const EMPTY_FILE_CHANGES: FileOnlyChange[] = [];
 
@@ -286,27 +244,6 @@ function createEntityFileDiff(
   }
 
   return fileDiff;
-}
-
-function ChangeBadge({ changeType }: { changeType: ChangeType }) {
-  const style = changeStyles[changeType];
-
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span
-          aria-label={style.label}
-          className={cn(
-            "flex size-5 shrink-0 items-center justify-center rounded border font-mono text-[10px] font-bold",
-            style.className,
-          )}
-        >
-          {style.shortLabel}
-        </span>
-      </TooltipTrigger>
-      <TooltipContent side="right">{style.label}</TooltipContent>
-    </Tooltip>
-  );
 }
 
 function SummaryStat({
@@ -785,117 +722,13 @@ function Sidebar({
       </div>
 
       <ScrollArea className="min-h-0 flex-1">
-        <nav aria-label="Changed semantic entities" className="py-2">
-          {fileGroups.map((group) => (
-            <details key={group.filePath} className="group/file mb-1">
-              <summary
-                className={cn(
-                  "flex h-9 cursor-pointer list-none items-center gap-2 px-3 text-xs font-medium transition-colors select-none hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden",
-                  selectedFilePath === group.filePath &&
-                    "bg-card text-foreground shadow-xs",
-                )}
-              >
-                <ChevronDown className="size-3.5 shrink-0 -rotate-90 text-muted-foreground transition-transform group-open/file:rotate-0" />
-                <FileCode2 className="size-3.5 shrink-0 text-muted-foreground" />
-                <ChangeBadge changeType={group.changeType} />
-                <button
-                  type="button"
-                  className="min-w-0 flex-1 truncate text-left hover:underline hover:underline-offset-2 focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-                  title={
-                    group.oldFilePath
-                      ? `View full diff for ${group.oldFilePath} → ${group.filePath}`
-                      : `View full diff for ${group.filePath}`
-                  }
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    onSelectFile(group.filePath);
-                  }}
-                >
-                  {group.oldFilePath ? (
-                    <>
-                      <span className="text-muted-foreground">
-                        {group.oldFilePath}
-                      </span>{" "}
-                      <span aria-hidden="true">→</span>{" "}
-                    </>
-                  ) : null}
-                  {group.filePath}
-                </button>
-                <span className="font-mono text-[10px] text-muted-foreground">
-                  {group.changes.length}
-                </span>
-              </summary>
-              <div className="space-y-0.5 pr-1.5 pl-12">
-                {group.fileChange && group.changes.length === 0 ? (
-                  <button
-                    type="button"
-                    onClick={() => onSelectFile(group.filePath)}
-                    className={cn(
-                      "group flex w-full items-center gap-2 rounded-md border border-transparent px-2 py-2 text-left transition-colors",
-                      selectedFilePath === group.filePath
-                        ? "border-border bg-card shadow-xs"
-                        : "hover:bg-sidebar-accent",
-                    )}
-                  >
-                    <FileCode2
-                      className={cn(
-                        "size-4 shrink-0",
-                        selectedFilePath === group.filePath
-                          ? "text-foreground"
-                          : "text-muted-foreground",
-                      )}
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[13px] font-medium">
-                        {group.fileChange.changeType === "binary"
-                          ? "Binary file"
-                          : "Untracked file"}
-                      </span>
-                      <span className="block truncate font-mono text-[10px] text-muted-foreground">
-                        {group.fileChange.fileStatus}
-                      </span>
-                    </span>
-                    <ChangeBadge changeType={group.changeType} />
-                  </button>
-                ) : null}
-                {group.changes.map((change) => (
-                  <button
-                    key={change.entityId}
-                    type="button"
-                    onClick={() => onSelectEntity(change.entityId)}
-                    className={cn(
-                      "group flex w-full items-center gap-2 rounded-md border border-transparent px-2 py-2 text-left transition-colors",
-                      selectedEntityId === change.entityId
-                        ? "border-border bg-card shadow-xs"
-                        : "hover:bg-sidebar-accent",
-                    )}
-                  >
-                    <EntityIcon
-                      entityType={change.entityType}
-                      className={cn(
-                        "size-4 shrink-0",
-                        selectedEntityId === change.entityId
-                          ? "text-foreground"
-                          : "text-muted-foreground",
-                      )}
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[13px] font-medium">
-                        {change.entityName || "(anonymous)"}
-                      </span>
-                      <span className="block truncate font-mono text-[10px] text-muted-foreground">
-                        {change.entityType}
-                        {change.startLine ? ` · L${change.startLine}` : ""}
-                      </span>
-                    </span>
-                    <ChangeBadge changeType={change.changeType} />
-                  </button>
-                ))}
-              </div>
-            </details>
-          ))}
-        </nav>
+        <FileTree
+          fileGroups={fileGroups}
+          selectedEntityId={selectedEntityId}
+          selectedFilePath={selectedFilePath}
+          onSelectEntity={onSelectEntity}
+          onSelectFile={onSelectFile}
+        />
       </ScrollArea>
     </aside>
   );
