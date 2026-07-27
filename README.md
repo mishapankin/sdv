@@ -34,16 +34,15 @@ same diff viewer for that repo, and use Refresh all to update the repository
 list.
 
 The server starts at `http://127.0.0.1:1555`, opens it in the default browser,
-and displays semantic entities from unstaged changes by default. The default
-view also includes untracked files as file-level Git changes. The comparison bar
-can switch to staged changes or compare two Git refs such as `HEAD~3` and
-`HEAD`. Recent commits are offered as searchable suggestions, and arbitrary
-valid refs are accepted.
+and displays all changes from `HEAD` to the working tree by default, including
+staged, unstaged, and untracked files. The comparison bar can switch to staged
+changes or compare two Git refs such as `HEAD~3` and `HEAD`. Recent commits are
+offered as searchable suggestions, and arbitrary valid refs are accepted.
 
 Use the refresh button to rerun the active comparison. The default command is:
 
 ```bash
-sem diff --verbose --format json
+sem diff HEAD --verbose --format json
 ```
 
 `sem` remains the source of truth for semantic entities. Git status/diff output

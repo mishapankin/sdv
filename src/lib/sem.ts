@@ -2,10 +2,15 @@ import "server-only";
 
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 
+import {
+  getGitDiffArgs,
+  getSemDiffArgs,
+  type ResolvedComparison,
+} from "@/lib/git-arguments";
+import { resolveCommit } from "@/lib/git-ref";
 import {
   type Comparison,
   type FileOnlyChange,
@@ -14,6 +19,8 @@ import {
   type GitCommitsResult,
   type SemanticDiffResult,
 } from "@/lib/sem-types";
+import { getProcessError } from "@/lib/process-error";
+import { readWorkingTreeFile } from "@/lib/working-tree-file";
 import { resolveRepositoryDirectory } from "@/lib/workspace";
 
 const execFileAsync = promisify(execFile);
@@ -36,20 +43,6 @@ function isExecFileError(error: unknown): error is ExecFileError {
   return typeof error === "object" && error !== null;
 }
 
-function getProcessError(error: unknown) {
-  if (
-    typeof error === "object" &&
-    error !== null &&
-    "stderr" in error &&
-    typeof error.stderr === "string" &&
-    error.stderr.trim()
-  ) {
-    return error.stderr.trim();
-  }
-
-  return error instanceof Error ? error.message : "Unknown process error";
-}
-
 function reportError(message: string) {
   console.error(`sdv: ${message}`);
 }
@@ -58,28 +51,30 @@ function getContentHash(content: string) {
   return createHash("sha256").update(content).digest("hex").slice(0, 16);
 }
 
-function getSemDiffArgs(comparison: Comparison) {
-  const args = ["diff", "--verbose", "--format", "json"];
-
+async function resolveComparison(
+  comparison: Comparison,
+  cwd: string,
+): Promise<ResolvedComparison> {
   if (comparison.mode === "staged") {
-    args.push("--staged");
-  } else if (comparison.mode === "commits") {
-    args.push("--from", comparison.from, "--to", comparison.to);
+    return comparison;
   }
 
-  return args;
-}
-
-function getGitDiffArgs(comparison: Comparison) {
-  if (comparison.mode === "staged") {
-    return ["diff", "--cached"];
+  if (comparison.mode === "changed") {
+    try {
+      return { mode: "changed", base: await resolveCommit(run, cwd, "HEAD") };
+    } catch {
+      throw new Error(
+        "Changed comparison requires a repository with at least one commit",
+      );
+    }
   }
 
-  if (comparison.mode === "commits") {
-    return ["diff", comparison.from, comparison.to];
-  }
+  const [from, to] = await Promise.all([
+    resolveCommit(run, cwd, comparison.from),
+    resolveCommit(run, cwd, comparison.to),
+  ]);
 
-  return ["diff"];
+  return { mode: "commits", from, to };
 }
 
 async function readUntrackedFiles(cwd: string) {
@@ -172,32 +167,25 @@ async function readIndexFile(cwd: string, filePath: string) {
   return readGitBlob(cwd, "", filePath);
 }
 
-async function readWorkingTreeFile(cwd: string, filePath: string) {
-  const absolutePath = path.resolve(cwd, filePath);
-  const relativePath = path.relative(cwd, absolutePath);
+async function isBinaryChange(
+  diffArgs: string[],
+  cwd: string,
+  filePath: string,
+) {
+  const { stdout } = await run(
+    "git",
+    [
+      ...diffArgs,
+      "--numstat",
+      "--no-ext-diff",
+      "--no-textconv",
+      "--",
+      filePath,
+    ],
+    cwd,
+  );
 
-  if (
-    relativePath.startsWith("..") ||
-    path.isAbsolute(relativePath) ||
-    relativePath === ""
-  ) {
-    throw new Error(`invalid file path: ${filePath}`);
-  }
-
-  try {
-    return await readFile(absolutePath, "utf8");
-  } catch (error) {
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      error.code === "ENOENT"
-    ) {
-      return "";
-    }
-
-    throw error;
-  }
+  return stdout.split("\n").some((line) => line.startsWith("-\t-\t"));
 }
 
 export async function readSemanticDiff(
@@ -206,10 +194,11 @@ export async function readSemanticDiff(
 ): Promise<SemanticDiffResult> {
   try {
     const cwd = await resolveRepositoryDirectory(repoId);
-    const shouldIncludeUntracked = comparison.mode === "unstaged";
+    const resolvedComparison = await resolveComparison(comparison, cwd);
+    const shouldIncludeUntracked = resolvedComparison.mode === "changed";
     const [{ stdout }, branchResult, rootResult, untrackedChanges] =
       await Promise.all([
-        run("sem", getSemDiffArgs(comparison), cwd),
+        run("sem", getSemDiffArgs(resolvedComparison), cwd),
         run("git", ["branch", "--show-current"], cwd),
         run("git", ["rev-parse", "--show-toplevel"], cwd),
         shouldIncludeUntracked
@@ -270,13 +259,13 @@ export async function readFileDiff(
   comparison: Comparison,
   repoId?: string,
 ): Promise<FileDiffResult> {
-  const diffArgs = getGitDiffArgs(comparison);
-
   try {
     const cwd = await resolveRepositoryDirectory(repoId);
+    const resolvedComparison = await resolveComparison(comparison, cwd);
+    const diffArgs = getGitDiffArgs(resolvedComparison);
     const [changedFileRecords, untrackedFiles] = await Promise.all([
       readChangedFiles(diffArgs, cwd),
-      comparison.mode === "unstaged"
+      resolvedComparison.mode === "changed"
         ? readUntrackedFiles(cwd)
         : Promise.resolve([]),
     ]);
@@ -286,22 +275,29 @@ export async function readFileDiff(
     const untrackedFileSet = new Set(untrackedFiles);
 
     if (untrackedFileSet.has(filePath)) {
-      const newContent = await readWorkingTreeFile(cwd, filePath);
+      const workingTreeFile = await readWorkingTreeFile(cwd, filePath);
 
-      if (!newContent) {
-        const message = `untracked file is empty or unreadable: ${filePath}`;
-        reportError(message);
-        return { ok: false, error: message };
+      if (workingTreeFile.binary) {
+        return {
+          ok: true,
+          data: {
+            kind: "binary",
+            filePath,
+            oldFilePath: filePath,
+            cacheKey: `untracked-binary:${filePath}`,
+          },
+        };
       }
 
       return {
         ok: true,
         data: {
+          kind: "text",
           filePath,
           oldFilePath: filePath,
           oldContent: "",
-          newContent,
-          cacheKey: `untracked:${filePath}:${getContentHash(newContent)}`,
+          newContent: workingTreeFile.content,
+          cacheKey: `untracked:${filePath}:${getContentHash(workingTreeFile.content)}`,
         },
       };
     }
@@ -314,30 +310,45 @@ export async function readFileDiff(
       return { ok: false, error: message };
     }
 
+    if (await isBinaryChange(diffArgs, cwd, filePath)) {
+      return {
+        ok: true,
+        data: {
+          kind: "binary",
+          filePath,
+          oldFilePath,
+          cacheKey: `${comparison.mode}:binary:${oldFilePath}:${filePath}`,
+        },
+      };
+    }
+
     const [oldContent, newContent] =
-      comparison.mode === "unstaged"
+      resolvedComparison.mode === "changed"
         ? await Promise.all([
-            readIndexFile(cwd, oldFilePath),
+            readGitBlob(cwd, resolvedComparison.base, oldFilePath),
             readWorkingTreeFile(cwd, filePath),
           ])
-        : comparison.mode === "staged"
+        : resolvedComparison.mode === "staged"
           ? await Promise.all([
               readGitBlob(cwd, "HEAD", oldFilePath),
               readIndexFile(cwd, filePath),
             ])
           : await Promise.all([
-              readGitBlob(cwd, comparison.from, oldFilePath),
-              readGitBlob(cwd, comparison.to, filePath),
+              readGitBlob(cwd, resolvedComparison.from, oldFilePath),
+              readGitBlob(cwd, resolvedComparison.to, filePath),
             ]);
+    const newTextContent =
+      typeof newContent === "string" ? newContent : newContent.content;
 
     return {
       ok: true,
       data: {
+        kind: "text",
         filePath,
         oldFilePath,
         oldContent,
-        newContent,
-        cacheKey: `${comparison.mode}:${oldFilePath}:${filePath}:${getContentHash(oldContent)}:${getContentHash(newContent)}`,
+        newContent: newTextContent,
+        cacheKey: `${comparison.mode}:${oldFilePath}:${filePath}:${getContentHash(oldContent)}:${getContentHash(newTextContent)}`,
       },
     };
   } catch (error) {

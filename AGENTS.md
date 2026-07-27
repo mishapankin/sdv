@@ -18,16 +18,16 @@ file status, while `sem` supplies semantic entity details where it can.
 - It starts a local web server on `localhost:1555` and prints
   `Running on localhost:1555`.
 - It does not need to open a browser automatically.
-- The default comparison shows unstaged changes from `sem diff --verbose
-  --format json` plus untracked files from Git status.
-- The MVP supports unstaged changes, staged changes, and comparisons between
-  two user-provided Git refs.
+- The default Changed comparison shows staged and unstaged changes from
+  `sem diff HEAD --verbose --format json` plus untracked files from Git status.
+- The MVP supports the Changed comparison, staged changes, and comparisons
+  between two user-provided Git refs.
 - Refresh reruns `sem` and refreshes Git file status; do not maintain a
   separate diff cache.
 - The sidebar is grouped by file. Files with semantic changes list their changed
   semantic entities with a Lucide icon for entity type and a label/icon for
   change type such as added, modified, deleted, moved, renamed, or reordered.
-- Untracked files are shown for the default unstaged comparison as file-level
+- Untracked files are shown for the default Changed comparison as file-level
   Git changes. They do not have semantic entities unless `sem` returns them.
 - macOS and Linux are the supported platforms for the MVP.
 - Assume the `sem` binary is available through `PATH`. If it is missing, print

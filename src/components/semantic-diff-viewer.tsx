@@ -63,11 +63,11 @@ import type {
   ChangeType,
   Comparison,
   FileOnlyChange,
-  FileStatus,
   GitCommit,
   SemanticChange,
   WorkspaceRepository,
 } from "@/lib/sem-types";
+import { groupByFile, hasFileInDiff } from "@/lib/group-changes";
 import { mergeModuleLevelChanges } from "@/lib/merge-module-changes";
 import { cn } from "@/lib/utils";
 
@@ -132,15 +132,15 @@ function getComparisonFromSearchParams(
     };
   }
 
-  return { mode: "unstaged" };
+  return { mode: "changed" };
 }
 
 function getComparisonLabel(comparison: Comparison) {
-  if (comparison.mode === "staged") return "Staged changes";
+  if (comparison.mode === "staged") return "Staged";
   if (comparison.mode === "commits") {
     return `${comparison.from} → ${comparison.to}`;
   }
-  return "Unstaged changes";
+  return "Changed";
 }
 
 function getSemCommand(comparison: Comparison) {
@@ -152,7 +152,7 @@ function getSemCommand(comparison: Comparison) {
     return `sem diff --from ${comparison.from} --to ${comparison.to} --verbose --format json`;
   }
 
-  return "sem diff --verbose --format json";
+  return "sem diff HEAD --verbose --format json";
 }
 
 function CommitSuggestions({
@@ -209,9 +209,9 @@ function ComparisonSelector({
           <SelectValue />
         </SelectTrigger>
         <SelectContent align="start">
-          <SelectItem value="unstaged">Unstaged changes</SelectItem>
-          <SelectItem value="staged">Staged changes</SelectItem>
-          <SelectItem value="commits">Compare commits</SelectItem>
+          <SelectItem value="changed">Changed</SelectItem>
+          <SelectItem value="staged">Staged</SelectItem>
+          <SelectItem value="commits">Compare refs</SelectItem>
         </SelectContent>
       </Select>
 
@@ -255,118 +255,6 @@ function ComparisonSelector({
         </form>
       ) : null}
     </div>
-  );
-}
-
-type FileGroup = {
-  filePath: string;
-  oldFilePath: string | null;
-  changeType: ChangeType;
-  changes: SemanticChange[];
-  fileChange?: FileOnlyChange;
-};
-
-function groupByFile(
-  changes: SemanticChange[],
-  fileChanges: FileOnlyChange[] = [],
-): FileGroup[] {
-  const groups = new Map<
-    string,
-    { changes: SemanticChange[]; fileChange?: FileOnlyChange }
-  >();
-
-  for (const change of changes) {
-    const current = groups.get(change.filePath) ?? { changes: [] };
-    current.changes.push(change);
-    groups.set(change.filePath, current);
-  }
-
-  for (const fileChange of fileChanges) {
-    const current = groups.get(fileChange.filePath) ?? { changes: [] };
-    current.fileChange = fileChange;
-    groups.set(fileChange.filePath, current);
-  }
-
-  return [...groups.entries()]
-    .sort(([left], [right]) => left.localeCompare(right))
-    .map(([filePath, group]) => ({
-      filePath,
-      oldFilePath:
-        getFileOldPath(filePath, group.changes) ??
-        group.fileChange?.oldFilePath ??
-        null,
-      changeType: getFileChangeType(
-        filePath,
-        group.changes,
-        group.fileChange,
-      ),
-      changes: group.changes.sort((left, right) => {
-        const leftLine = left.startLine ?? left.oldStartLine ?? 0;
-        const rightLine = right.startLine ?? right.oldStartLine ?? 0;
-        return leftLine - rightLine;
-      }),
-      fileChange: group.fileChange,
-    }));
-}
-
-function getFileOldPath(filePath: string, changes: SemanticChange[]) {
-  const oldPath = changes.find(
-    (change) => change.oldFilePath && change.oldFilePath !== filePath,
-  )?.oldFilePath;
-
-  return oldPath ?? null;
-}
-
-function getFileChangeType(
-  filePath: string,
-  changes: SemanticChange[],
-  fileChange?: FileOnlyChange,
-): ChangeType {
-  if (!changes.length && fileChange) {
-    return getChangeTypeFromFileStatus(fileChange.fileStatus);
-  }
-
-  const changeTypes = new Set(changes.map((change) => change.changeType));
-
-  if (changeTypes.size === 1) {
-    const [changeType] = changeTypes;
-
-    if (changeType === "added" || changeType === "deleted") {
-      return changeType;
-    }
-  }
-
-  if (
-    changes.some(
-      (change) => change.oldFilePath && change.oldFilePath !== filePath,
-    )
-  ) {
-    return "renamed";
-  }
-
-  return "modified";
-}
-
-function getChangeTypeFromFileStatus(fileStatus: FileStatus): ChangeType {
-  if (fileStatus === "added" || fileStatus === "deleted") {
-    return fileStatus;
-  }
-
-  if (fileStatus === "renamed") {
-    return "renamed";
-  }
-
-  return "modified";
-}
-
-function hasFileInDiff(
-  filePath: string,
-  changes: SemanticChange[],
-  fileChanges: FileOnlyChange[],
-) {
-  return (
-    changes.some((change) => change.filePath === filePath) ||
-    fileChanges.some((change) => change.filePath === filePath)
   );
 }
 
@@ -1294,6 +1182,50 @@ function FileDiffView({
   );
 }
 
+function BinaryFileView({
+  filePath,
+  oldFilePath,
+  comparison,
+}: {
+  filePath: string;
+  oldFilePath: string;
+  comparison: Comparison;
+}) {
+  return (
+    <main className="flex h-full min-w-0 flex-col bg-background">
+      <div className="flex min-h-20 shrink-0 items-center gap-4 border-b bg-card px-6 py-3">
+        <FileCode2 className="size-5 text-muted-foreground" />
+        <div className="min-w-0">
+          <div className="flex items-center gap-2.5">
+            <h1 className="truncate text-lg font-semibold tracking-tight">
+              {filePath}
+            </h1>
+            <Badge
+              variant="outline"
+              className="rounded-md font-mono text-[10px] tracking-wide uppercase"
+            >
+              Binary file
+            </Badge>
+          </div>
+          <p className="mt-1.5 truncate font-mono text-xs text-muted-foreground">
+            {oldFilePath !== filePath ? `${oldFilePath} → ${filePath} · ` : ""}
+            {getComparisonLabel(comparison)}
+          </p>
+        </div>
+      </div>
+      <div className="flex min-h-0 flex-1 items-center justify-center p-8">
+        <div className="max-w-sm rounded-lg border bg-card p-6 text-center shadow-sm">
+          <FileCode2 className="mx-auto size-6 text-muted-foreground" />
+          <h2 className="mt-3 text-sm font-semibold">Binary content changed</h2>
+          <p className="mt-1.5 text-sm leading-6 text-muted-foreground">
+            A line-level preview is not available for binary files.
+          </p>
+        </div>
+      </div>
+    </main>
+  );
+}
+
 function EmptyState({ comparison }: { comparison: Comparison }) {
   return (
     <div className="flex h-full w-full items-center justify-center bg-background p-8">
@@ -1513,7 +1445,7 @@ export function SemanticDiffViewer() {
     params.delete("entity");
     params.delete("file");
 
-    if (mode === "unstaged") {
+    if (mode === "changed") {
       params.delete("mode");
       params.delete("from");
       params.delete("to");
@@ -1769,7 +1701,9 @@ export function SemanticDiffViewer() {
                           title="Unable to load file diff"
                         />
                       ) : null}
-                      {effectiveSelectedFilePath && fileQuery.data?.ok ? (
+                      {effectiveSelectedFilePath &&
+                      fileQuery.data?.ok &&
+                      fileQuery.data.data.kind === "text" ? (
                         <FileDiffView
                           key={fileQuery.data.data.cacheKey}
                           filePath={fileQuery.data.data.filePath}
@@ -1778,6 +1712,16 @@ export function SemanticDiffViewer() {
                           newContent={fileQuery.data.data.newContent}
                           cacheKey={fileQuery.data.data.cacheKey}
                           theme={theme}
+                          comparison={comparison}
+                        />
+                      ) : null}
+                      {effectiveSelectedFilePath &&
+                      fileQuery.data?.ok &&
+                      fileQuery.data.data.kind === "binary" ? (
+                        <BinaryFileView
+                          key={fileQuery.data.data.cacheKey}
+                          filePath={fileQuery.data.data.filePath}
+                          oldFilePath={fileQuery.data.data.oldFilePath}
                           comparison={comparison}
                         />
                       ) : null}

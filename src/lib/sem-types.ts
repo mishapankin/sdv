@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const comparisonSchema = z.discriminatedUnion("mode", [
-  z.object({ mode: z.literal("unstaged") }),
+  z.object({ mode: z.literal("changed") }),
   z.object({ mode: z.literal("staged") }),
   z.object({
     mode: z.literal("commits"),
@@ -101,13 +101,21 @@ export type SemanticDiffResult =
 export type FileDiffResult =
   | {
       ok: true;
-      data: {
-        filePath: string;
-        oldFilePath: string;
-        oldContent: string;
-        newContent: string;
-        cacheKey: string;
-      };
+      data:
+        | {
+            kind: "text";
+            filePath: string;
+            oldFilePath: string;
+            oldContent: string;
+            newContent: string;
+            cacheKey: string;
+          }
+        | {
+            kind: "binary";
+            filePath: string;
+            oldFilePath: string;
+            cacheKey: string;
+          };
     }
   | {
       ok: false;

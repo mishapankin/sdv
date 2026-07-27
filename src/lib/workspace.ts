@@ -9,6 +9,7 @@ import type {
   WorkspaceRepositoriesResult,
   WorkspaceRepository,
 } from "@/lib/sem-types";
+import { getProcessError } from "@/lib/process-error";
 
 const execFileAsync = promisify(execFile);
 
@@ -18,20 +19,6 @@ async function run(command: string, args: string[], cwd: string) {
     encoding: "utf8",
     maxBuffer: 2 * 1024 * 1024,
   });
-}
-
-function getProcessError(error: unknown) {
-  if (
-    typeof error === "object" &&
-    error !== null &&
-    "stderr" in error &&
-    typeof error.stderr === "string" &&
-    error.stderr.trim()
-  ) {
-    return error.stderr.trim();
-  }
-
-  return error instanceof Error ? error.message : "Unknown process error";
 }
 
 function getWorkspaceDirectory() {

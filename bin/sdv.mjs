@@ -87,7 +87,7 @@ const semCheck = spawnSync("sem", ["--version"], {
 });
 
 if (semCheck.error?.code === "ENOENT") {
-  console.error("sdv: sem is missing from PATH");
+  console.log("sdv: sem is missing from PATH");
   process.exit(1);
 }
 
