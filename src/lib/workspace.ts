@@ -53,21 +53,26 @@ async function isGitRepository(directory: string) {
   }
 }
 
-function getChangedFilePath(statusLine: string) {
-  const pathPart = statusLine.slice(3);
-  const renamedPath = pathPart.split(" -> ").at(-1);
-  return renamedPath || pathPart;
-}
+export function parseChangedFileCount(statusOutput: string) {
+  const records = statusOutput.split("\0");
+  let count = 0;
 
-function parseChangedFileCount(statusOutput: string) {
-  const files = new Set<string>();
+  for (let index = 0; index < records.length; index += 1) {
+    const record = records[index];
 
-  for (const line of statusOutput.split("\n")) {
-    if (!line.trim()) continue;
-    files.add(getChangedFilePath(line));
+    if (!record) continue;
+
+    const status = record.slice(0, 2);
+    count += 1;
+
+    // Porcelain v1 -z emits the destination first and the source as a second
+    // NUL-delimited field for renames and copies.
+    if (/[RC]/.test(status)) {
+      index += 1;
+    }
   }
 
-  return files.size;
+  return count;
 }
 
 async function readRepositoryStatus(
@@ -80,7 +85,7 @@ async function readRepositoryStatus(
   try {
     const [branchResult, statusResult] = await Promise.all([
       run("git", ["branch", "--show-current"], directory),
-      run("git", ["status", "--porcelain=v1"], directory),
+      run("git", ["status", "--porcelain=v1", "-z"], directory),
     ]);
     const changedFileCount = parseChangedFileCount(statusResult.stdout);
 
@@ -158,6 +163,45 @@ async function discoverRepositoryCandidates() {
   return candidates;
 }
 
+type RepositoryCandidate = Awaited<
+  ReturnType<typeof discoverRepositoryCandidates>
+>[number];
+
+let repositoryCache:
+  | {
+      key: string;
+      candidates: Promise<RepositoryCandidate[]>;
+    }
+  | undefined;
+
+function getRepositoryCacheKey() {
+  return `${getWorkspaceDirectory()}\0${getSearchDepth()}`;
+}
+
+async function getRepositoryCandidates(refresh = false) {
+  const key = getRepositoryCacheKey();
+
+  if (refresh || repositoryCache?.key !== key) {
+    const candidates = discoverRepositoryCandidates();
+    repositoryCache = { key, candidates };
+  }
+
+  const candidates = repositoryCache.candidates;
+
+  try {
+    return await candidates;
+  } catch (error) {
+    if (
+      repositoryCache?.key === key &&
+      repositoryCache.candidates === candidates
+    ) {
+      repositoryCache = undefined;
+    }
+
+    throw error;
+  }
+}
+
 function sortRepositories(
   left: WorkspaceRepository,
   right: WorkspaceRepository,
@@ -177,7 +221,7 @@ export async function readWorkspaceRepositories(): Promise<WorkspaceRepositories
   const workspaceDirectory = getWorkspaceDirectory();
 
   try {
-    const candidates = await discoverRepositoryCandidates();
+    const candidates = await getRepositoryCandidates(true);
     const repositories = (
       await Promise.all(
         candidates.map((candidate) =>
@@ -206,7 +250,7 @@ export async function readWorkspaceRepositories(): Promise<WorkspaceRepositories
 }
 
 export async function resolveRepositoryDirectory(repoId: string | undefined) {
-  const repositories = await discoverRepositoryCandidates();
+  const repositories = await getRepositoryCandidates();
   const selectedId = repoId || repositories[0]?.id;
   const repository = repositories.find((candidate) => candidate.id === selectedId);
 

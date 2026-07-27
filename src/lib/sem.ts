@@ -25,22 +25,29 @@ import { resolveRepositoryDirectory } from "@/lib/workspace";
 
 const execFileAsync = promisify(execFile);
 
-async function run(command: string, args: string[], cwd: string) {
-  return execFileAsync(command, args, {
+type CommandOutput = {
+  stdout: string;
+  stderr: string;
+};
+
+export type CommandRunner = (
+  command: string,
+  args: string[],
+  cwd: string,
+) => Promise<CommandOutput>;
+
+async function run(
+  command: string,
+  args: string[],
+  cwd: string,
+): Promise<CommandOutput> {
+  const { stdout, stderr } = await execFileAsync(command, args, {
     cwd,
     encoding: "utf8",
     maxBuffer: 20 * 1024 * 1024,
   });
-}
 
-type ExecFileError = Error & {
-  code?: number | string;
-  stdout?: string;
-  stderr?: string;
-};
-
-function isExecFileError(error: unknown): error is ExecFileError {
-  return typeof error === "object" && error !== null;
+  return { stdout, stderr };
 }
 
 function reportError(message: string) {
@@ -54,6 +61,7 @@ function getContentHash(content: string) {
 async function resolveComparison(
   comparison: Comparison,
   cwd: string,
+  execute: CommandRunner = run,
 ): Promise<ResolvedComparison> {
   if (comparison.mode === "staged") {
     return comparison;
@@ -61,7 +69,10 @@ async function resolveComparison(
 
   if (comparison.mode === "changed") {
     try {
-      return { mode: "changed", base: await resolveCommit(run, cwd, "HEAD") };
+      return {
+        mode: "changed",
+        base: await resolveCommit(execute, cwd, "HEAD"),
+      };
     } catch {
       throw new Error(
         "Changed comparison requires a repository with at least one commit",
@@ -70,15 +81,18 @@ async function resolveComparison(
   }
 
   const [from, to] = await Promise.all([
-    resolveCommit(run, cwd, comparison.from),
-    resolveCommit(run, cwd, comparison.to),
+    resolveCommit(execute, cwd, comparison.from),
+    resolveCommit(execute, cwd, comparison.to),
   ]);
 
   return { mode: "commits", from, to };
 }
 
-async function readUntrackedFiles(cwd: string) {
-  const { stdout } = await run(
+async function readUntrackedFiles(
+  cwd: string,
+  execute: CommandRunner = run,
+) {
+  const { stdout } = await execute(
     "git",
     ["ls-files", "--others", "--exclude-standard", "-z"],
     cwd,
@@ -87,8 +101,11 @@ async function readUntrackedFiles(cwd: string) {
   return stdout.split("\0").filter(Boolean);
 }
 
-async function readUntrackedFileChanges(cwd: string): Promise<FileOnlyChange[]> {
-  const files = await readUntrackedFiles(cwd);
+async function readUntrackedFileChanges(
+  cwd: string,
+  execute: CommandRunner = run,
+): Promise<FileOnlyChange[]> {
+  const files = await readUntrackedFiles(cwd, execute);
 
   return files.map((filePath) => ({
     changeType: "untracked" as const,
@@ -101,6 +118,7 @@ async function readUntrackedFileChanges(cwd: string): Promise<FileOnlyChange[]> 
 type GitChangedFile = {
   filePath: string;
   oldFilePath: string;
+  status: string;
 };
 
 function parseGitNameStatus(stdout: string): GitChangedFile[] {
@@ -117,7 +135,7 @@ function parseGitNameStatus(stdout: string): GitChangedFile[] {
       const filePath = fields[index + 2];
 
       if (oldFilePath && filePath) {
-        files.push({ filePath, oldFilePath });
+        files.push({ filePath, oldFilePath, status: status[0] });
       }
 
       index += 2;
@@ -127,7 +145,7 @@ function parseGitNameStatus(stdout: string): GitChangedFile[] {
     const filePath = fields[index + 1];
 
     if (filePath) {
-      files.push({ filePath, oldFilePath: filePath });
+      files.push({ filePath, oldFilePath: filePath, status: status[0] });
     }
 
     index += 1;
@@ -139,8 +157,9 @@ function parseGitNameStatus(stdout: string): GitChangedFile[] {
 async function readChangedFiles(
   diffArgs: string[],
   cwd: string,
+  execute: CommandRunner = run,
 ): Promise<GitChangedFile[]> {
-  const { stdout } = await run(
+  const { stdout } = await execute(
     "git",
     [...diffArgs, "--name-status", "-z", "--find-renames"],
     cwd,
@@ -149,30 +168,36 @@ async function readChangedFiles(
   return parseGitNameStatus(stdout);
 }
 
-async function readGitBlob(cwd: string, ref: string, filePath: string) {
-  try {
-    const { stdout } = await run("git", ["show", `${ref}:${filePath}`], cwd);
+async function readGitBlob(
+  cwd: string,
+  ref: string,
+  filePath: string,
+  execute: CommandRunner = run,
+) {
+  const { stdout } = await execute(
+    "git",
+    ["show", `${ref}:${filePath}`],
+    cwd,
+  );
 
-    return stdout;
-  } catch (error) {
-    if (isExecFileError(error)) {
-      return "";
-    }
-
-    throw error;
-  }
+  return stdout;
 }
 
-async function readIndexFile(cwd: string, filePath: string) {
-  return readGitBlob(cwd, "", filePath);
+async function readIndexFile(
+  cwd: string,
+  filePath: string,
+  execute: CommandRunner = run,
+) {
+  return readGitBlob(cwd, "", filePath, execute);
 }
 
 async function isBinaryChange(
   diffArgs: string[],
   cwd: string,
   filePath: string,
+  execute: CommandRunner = run,
 ) {
-  const { stdout } = await run(
+  const { stdout } = await execute(
     "git",
     [
       ...diffArgs,
@@ -194,15 +219,37 @@ export async function readSemanticDiff(
 ): Promise<SemanticDiffResult> {
   try {
     const cwd = await resolveRepositoryDirectory(repoId);
-    const resolvedComparison = await resolveComparison(comparison, cwd);
+    return await readSemanticDiffFromRepository(comparison, cwd);
+  } catch (error) {
+    const message = getProcessError(error);
+    reportError(message);
+
+    return {
+      ok: false,
+      error: message,
+    };
+  }
+}
+
+export async function readSemanticDiffFromRepository(
+  comparison: Comparison,
+  cwd: string,
+  execute: CommandRunner = run,
+): Promise<SemanticDiffResult> {
+  try {
+    const resolvedComparison = await resolveComparison(
+      comparison,
+      cwd,
+      execute,
+    );
     const shouldIncludeUntracked = resolvedComparison.mode === "changed";
     const [{ stdout }, branchResult, rootResult, untrackedChanges] =
       await Promise.all([
-        run("sem", getSemDiffArgs(resolvedComparison), cwd),
-        run("git", ["branch", "--show-current"], cwd),
-        run("git", ["rev-parse", "--show-toplevel"], cwd),
+        execute("sem", getSemDiffArgs(resolvedComparison), cwd),
+        execute("git", ["branch", "--show-current"], cwd),
+        execute("git", ["rev-parse", "--show-toplevel"], cwd),
         shouldIncludeUntracked
-          ? readUntrackedFileChanges(cwd)
+          ? readUntrackedFileChanges(cwd, execute)
           : Promise.resolve([]),
       ]);
     let json: unknown;
@@ -261,16 +308,35 @@ export async function readFileDiff(
 ): Promise<FileDiffResult> {
   try {
     const cwd = await resolveRepositoryDirectory(repoId);
-    const resolvedComparison = await resolveComparison(comparison, cwd);
+    return await readFileDiffFromRepository(filePath, comparison, cwd);
+  } catch (error) {
+    const message = getProcessError(error);
+    reportError(message);
+    return { ok: false, error: message };
+  }
+}
+
+export async function readFileDiffFromRepository(
+  filePath: string,
+  comparison: Comparison,
+  cwd: string,
+  execute: CommandRunner = run,
+): Promise<FileDiffResult> {
+  try {
+    const resolvedComparison = await resolveComparison(
+      comparison,
+      cwd,
+      execute,
+    );
     const diffArgs = getGitDiffArgs(resolvedComparison);
     const [changedFileRecords, untrackedFiles] = await Promise.all([
-      readChangedFiles(diffArgs, cwd),
+      readChangedFiles(diffArgs, cwd, execute),
       resolvedComparison.mode === "changed"
-        ? readUntrackedFiles(cwd)
+        ? readUntrackedFiles(cwd, execute)
         : Promise.resolve([]),
     ]);
     const changedFiles = new Map(
-      changedFileRecords.map((file) => [file.filePath, file.oldFilePath]),
+      changedFileRecords.map((file) => [file.filePath, file]),
     );
     const untrackedFileSet = new Set(untrackedFiles);
 
@@ -302,15 +368,17 @@ export async function readFileDiff(
       };
     }
 
-    const oldFilePath = changedFiles.get(filePath);
+    const changedFile = changedFiles.get(filePath);
 
-    if (!oldFilePath) {
+    if (!changedFile) {
       const message = `file is not part of the selected comparison: ${filePath}`;
       reportError(message);
       return { ok: false, error: message };
     }
 
-    if (await isBinaryChange(diffArgs, cwd, filePath)) {
+    const { oldFilePath, status } = changedFile;
+
+    if (await isBinaryChange(diffArgs, cwd, filePath, execute)) {
       return {
         ok: true,
         data: {
@@ -322,21 +390,29 @@ export async function readFileDiff(
       };
     }
 
-    const [oldContent, newContent] =
+    const oldRef =
       resolvedComparison.mode === "changed"
-        ? await Promise.all([
-            readGitBlob(cwd, resolvedComparison.base, oldFilePath),
-            readWorkingTreeFile(cwd, filePath),
-          ])
-        : resolvedComparison.mode === "staged"
-          ? await Promise.all([
-              readGitBlob(cwd, "HEAD", oldFilePath),
-              readIndexFile(cwd, filePath),
-            ])
-          : await Promise.all([
-              readGitBlob(cwd, resolvedComparison.from, oldFilePath),
-              readGitBlob(cwd, resolvedComparison.to, filePath),
-            ]);
+        ? resolvedComparison.base
+        : resolvedComparison.mode === "commits"
+          ? resolvedComparison.from
+          : "HEAD";
+    const oldContent =
+      status === "A"
+        ? ""
+        : await readGitBlob(cwd, oldRef, oldFilePath, execute);
+    const newContent =
+      status === "D"
+        ? ""
+        : resolvedComparison.mode === "changed"
+          ? await readWorkingTreeFile(cwd, filePath)
+          : resolvedComparison.mode === "staged"
+            ? await readIndexFile(cwd, filePath, execute)
+            : await readGitBlob(
+                cwd,
+                resolvedComparison.to,
+                filePath,
+                execute,
+              );
     const newTextContent =
       typeof newContent === "string" ? newContent : newContent.content;
 
