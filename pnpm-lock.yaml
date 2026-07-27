@@ -4,9 +4,6 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-overrides:
-  sdv: 'link:'
-
 importers:
 
   .:
@@ -44,9 +41,6 @@ importers:
       react-resizable-panels:
         specifier: ^4.12.2
         version: 4.12.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      sdv:
-        specifier: 'link:'
-        version: 'link:'
       shadcn:
         specifier: ^4.15.0
         version: 4.15.0(typescript@5.9.3)

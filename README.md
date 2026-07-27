@@ -8,7 +8,7 @@ from [`sem`](https://github.com/ataraxy-labs/sem).
 - macOS or Linux
 - Node.js 22.12+
 - `sem` available in `PATH`
-- A Git repository, or a folder containing Git repositories
+- A Git worktree
 
 ## Run
 
@@ -26,18 +26,15 @@ Then run SDV from any Git repository:
 sdv
 ```
 
-You can also run SDV from a folder containing multiple Git repositories. By
-default, SDV searches recursively without a depth limit and stops descending
-once it finds a repository. The repository list shows changed repositories
-first, including the number of changed files. Select a repository to open the
-same diff viewer for that repo, and use Refresh all to update the repository
-list.
+SDV inspects the Git worktree in the directory where it is launched. The server
+starts at `http://127.0.0.1:1555` and prints `Running on localhost:1555`; it
+does not open a browser unless `--open` is passed.
 
-The server starts at `http://127.0.0.1:1555`, opens it in the default browser,
-and displays all changes from `HEAD` to the working tree by default, including
-staged, unstaged, and untracked files. The comparison bar can switch to staged
-changes or compare two Git refs such as `HEAD~3` and `HEAD`. Recent commits are
-offered as searchable suggestions, and arbitrary valid refs are accepted.
+The default view displays all changes from `HEAD` to the working tree,
+including staged, unstaged, and untracked files. The comparison bar can switch
+to staged changes or compare two Git refs such as `HEAD~3` and `HEAD`. Recent
+commits are offered as searchable suggestions, and arbitrary valid refs are
+accepted.
 
 Use the refresh button to rerun the active comparison. The default command is:
 
@@ -53,8 +50,7 @@ is used for repository dirty state, untracked files, and full-file diffs.
 ```text
 -p, --port <number>  Server port (default: 1555)
 --host <host>        Server host (default: 127.0.0.1)
---search-depth <n>   Repository search depth; 0 only checks cwd, 1 checks direct children (default: unlimited)
---no-open            Do not open the browser automatically
+--open               Open the browser automatically
 -V, --version        Print the SDV version
 -h, --help           Show help
 ```

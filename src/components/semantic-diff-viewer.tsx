@@ -1138,8 +1138,7 @@ function NoRepositoriesState() {
           No repositories found
         </h2>
         <p className="mt-1.5 text-sm leading-6 text-muted-foreground">
-          Run `sdv` inside a Git repository or from a folder containing Git
-          repositories as direct child directories.
+          Run `sdv` from inside a Git worktree.
         </p>
       </div>
     </div>
