@@ -12,6 +12,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "generate:file-icons": "node scripts/generate-file-icons.mjs",
     "lint": "eslint",
     "test": "vitest run",
     "sdv": "node ./bin/sdv.mjs"
@@ -35,6 +36,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@iconify-json/vscode-icons": "^1.2.67",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^26.1.1",
     "@types/react": "^19.2.17",

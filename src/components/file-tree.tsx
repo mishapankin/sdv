@@ -2,7 +2,6 @@
 
 import {
   ChevronRight,
-  FileCode2,
   Folder,
   FolderOpen,
 } from "lucide-react";
@@ -10,6 +9,7 @@ import { useMemo } from "react";
 
 import { ChangeBadge } from "@/components/change-badge";
 import { EntityIcon } from "@/components/entity-icons";
+import { FileTypeIcon } from "@/components/file-type-icon";
 import {
   Collapsible,
   CollapsibleContent,
@@ -166,7 +166,7 @@ function FileNode({
           className="flex min-w-0 flex-1 items-center gap-1.5 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
           title={fileTitle}
         >
-          <FileCode2 className="size-3.5 shrink-0 text-sky-700 dark:text-sky-400" />
+          <FileTypeIcon filePath={node.path} className="size-4 shrink-0" />
           <span className="min-w-0 flex-1 truncate text-xs font-medium">
             {node.name}
           </span>

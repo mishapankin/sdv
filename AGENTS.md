@@ -44,7 +44,8 @@ file status, while `sem` supplies semantic entity details where it can.
 - TypeScript 5
 - Tailwind CSS 4
 - shadcn/ui using the existing `radix-nova` configuration
-- `lucide-react` for all interface icons
+- `lucide-react` for interface, action, and semantic entity icons
+- The generated local VSCode Icons subset for filesystem file-type icons only
 - TanStack Query (`@tanstack/react-query`) for client-side server state,
   refresh, and comparison changes
 - `@pierre/diffs` for split or unified code diffs with Shiki syntax
