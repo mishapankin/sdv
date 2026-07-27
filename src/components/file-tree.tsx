@@ -163,18 +163,13 @@ function FileNode({
         <button
           type="button"
           onClick={() => onSelectFile(node.path)}
-          className="flex min-w-0 flex-1 items-center gap-1.5 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+          className="grid min-w-0 flex-1 grid-cols-[1rem_minmax(0,1fr)_1.25rem] items-center gap-x-1.5 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
           title={fileTitle}
         >
           <FileTypeIcon filePath={node.path} className="size-4 shrink-0" />
-          <span className="min-w-0 flex-1 truncate text-xs font-medium">
+          <span className="min-w-0 truncate text-xs font-medium">
             {node.name}
           </span>
-          {hasEntities ? (
-            <span className="font-mono text-[10px] text-muted-foreground">
-              {node.group.changes.length}
-            </span>
-          ) : null}
           <ChangeBadge changeType={node.group.changeType} />
         </button>
       </div>
