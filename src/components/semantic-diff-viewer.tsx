@@ -10,12 +10,11 @@ import {
   CirclePlus,
   GitBranch,
   GitCommitHorizontal,
-  GitCompareArrows,
   GitMerge,
   Minus,
   RefreshCw,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   getFileDiff,
@@ -125,6 +124,13 @@ export function SemanticDiffViewer() {
   });
   const result = query.data;
   const diff = result?.ok ? result.data : undefined;
+
+  useEffect(() => {
+    if (diff) {
+      document.title = `SDV: ${diff.repositoryName}`;
+    }
+  }, [diff]);
+
   const visibleChanges = useMemo(
     () =>
       diff
@@ -245,14 +251,9 @@ export function SemanticDiffViewer() {
         <div className="flex h-dvh min-h-[520px] flex-col overflow-hidden bg-background">
         <header className="flex h-14 shrink-0 items-center gap-4 overflow-x-auto border-b bg-card px-4">
           <div className="flex min-w-0 shrink-0 items-center gap-4">
-            <div className="flex items-center gap-2">
-              <div className="flex size-7 items-center justify-center rounded-md bg-slate-950 text-white shadow-sm">
-                <GitCompareArrows className="size-4" />
-              </div>
-              <span className="text-[15px] font-semibold tracking-tight">
-                Semantic Diff
-              </span>
-            </div>
+            <span className="text-[15px] font-semibold tracking-tight">
+              SDV
+            </span>
 
             {diff ? (
               <div className="hidden min-w-0 items-center gap-2 border-l pl-4 text-xs text-muted-foreground sm:flex">

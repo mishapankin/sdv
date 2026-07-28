@@ -249,6 +249,17 @@ export async function readWorkspaceRepositories(): Promise<WorkspaceRepositories
   }
 }
 
+export async function readDefaultRepositoryName() {
+  const directory = await resolveRepositoryDirectory(undefined);
+  const { stdout } = await run(
+    "git",
+    ["rev-parse", "--show-toplevel"],
+    directory,
+  );
+
+  return path.basename(stdout.trim());
+}
+
 export async function resolveRepositoryDirectory(repoId: string | undefined) {
   const repositories = await getRepositoryCandidates();
   const selectedId = repoId || repositories[0]?.id;
