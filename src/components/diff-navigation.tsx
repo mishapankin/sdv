@@ -267,17 +267,21 @@ export function DiffHorizontalScrollbars({
 
   return (
     <div
+      role="group"
+      aria-label="Horizontal diff navigation"
       className={cn(
-        "sticky bottom-0 z-10 mt-2 grid grid-cols-2 gap-px rounded-md border bg-card/95 p-1 shadow-sm backdrop-blur",
+        "mx-2 mt-2 grid min-w-0 shrink-0 grid-cols-2 gap-1 overflow-hidden rounded-full border border-border/70 bg-background/90 px-1.5 py-1 shadow-sm transition-opacity",
         !hasOverflow &&
-          "pointer-events-none mt-0 h-0 overflow-hidden border-transparent p-0 opacity-0",
+          "pointer-events-none m-0 h-0 border-transparent p-0 opacity-0",
       )}
     >
       <div
         ref={deletionProxyRef}
+        role="region"
         aria-label="Scroll previous version horizontally"
+        tabIndex={hasDeletionOverflow ? 0 : -1}
         className={cn(
-          "h-3 overflow-x-auto overflow-y-hidden",
+          "diff-proxy-scrollbar h-2.5 min-w-0 max-w-full overflow-x-auto overflow-y-hidden rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
           !hasDeletionOverflow && "invisible",
         )}
       >
@@ -288,9 +292,11 @@ export function DiffHorizontalScrollbars({
       </div>
       <div
         ref={additionProxyRef}
+        role="region"
         aria-label="Scroll current version horizontally"
+        tabIndex={hasAdditionOverflow ? 0 : -1}
         className={cn(
-          "h-3 overflow-x-auto overflow-y-hidden",
+          "diff-proxy-scrollbar h-2.5 min-w-0 max-w-full overflow-x-auto overflow-y-hidden rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
           !hasAdditionOverflow && "invisible",
         )}
       >

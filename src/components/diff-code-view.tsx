@@ -32,12 +32,12 @@ export function DiffCodeView({
   );
 
   return (
-    <div className="relative min-h-0 flex-1 p-5">
+    <div className="flex min-h-0 flex-col p-5">
       <CodeView
         ref={codeViewRef}
         containerRef={containerRef}
         items={items}
-        className="h-full overflow-y-auto rounded-lg border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
+        className="min-h-0 shrink overflow-y-auto rounded-lg border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
         options={{
           diffStyle: "split",
           diffIndicators: "bars",
@@ -49,14 +49,10 @@ export function DiffCodeView({
           layout: { paddingTop: 0, paddingBottom: 0, gap: 0 },
         }}
       />
-      <div className="pointer-events-none absolute inset-x-5 bottom-5 z-10">
-        <div className="pointer-events-auto">
-          <DiffHorizontalScrollbars
-            diffRootRef={containerRef}
-            syncKey={syncKey}
-          />
-        </div>
-      </div>
+      <DiffHorizontalScrollbars
+        diffRootRef={containerRef}
+        syncKey={syncKey}
+      />
     </div>
   );
 }
