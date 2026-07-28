@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { WorkerPoolContextProvider } from "@pierre/diffs/react";
 import {
   CirclePlus,
   GitBranch,
@@ -21,6 +22,7 @@ import {
 import { ComparisonSelector } from "@/components/comparison-controls";
 import { DiffSidebar } from "@/components/diff-sidebar";
 import { EntityDiffView } from "@/components/entity-diff-view";
+import { EntityPanel } from "@/components/entity-panel";
 import {
   BinaryFileView,
   FileDiffView,
@@ -47,12 +49,24 @@ import {
   NoRepositoriesState,
 } from "@/components/viewer-states";
 import { getComparisonLabel, getSemCommand } from "@/lib/comparison";
+import { resolveDiffSelection } from "@/lib/diff-selection";
 import { groupByFile, hasFileInDiff } from "@/lib/group-changes";
 import { mergeModuleLevelChanges } from "@/lib/merge-module-changes";
 import type { FileOnlyChange } from "@/lib/sem-types";
 import { cn } from "@/lib/utils";
 
 const EMPTY_FILE_CHANGES: FileOnlyChange[] = [];
+const DIFF_WORKER_POOL_OPTIONS = {
+  poolSize: 2,
+  workerFactory: () =>
+    new Worker(
+      new URL("@pierre/diffs/worker/worker.js", import.meta.url),
+      { type: "module" },
+    ),
+};
+const DIFF_HIGHLIGHTER_OPTIONS = {
+  lineDiffType: "word-alt" as const,
+};
 
 function SummaryStat({
   label,
@@ -137,32 +151,29 @@ export function SemanticDiffViewer() {
     () => groupByFile(visibleChanges, visibleFileChanges),
     [visibleChanges, visibleFileChanges],
   );
-  const navigableChanges = useMemo(
-    () => fileGroups.flatMap((group) => group.changes),
-    [fileGroups],
+  const {
+    navigableChanges,
+    selectedChange,
+    selectedEntityId,
+    selectedEntityIndex,
+    effectiveSelectedFilePath,
+    selectedFileGroup,
+    fileDiffPath,
+  } = useMemo(
+    () =>
+      resolveDiffSelection(
+        fileGroups,
+        selectedEntityIdFromUrl,
+        selectedFilePath,
+      ),
+    [fileGroups, selectedEntityIdFromUrl, selectedFilePath],
   );
-  const selectedChange =
-    selectedFilePath === undefined
-      ? (navigableChanges.find(
-          (change) => change.entityId === selectedEntityIdFromUrl,
-        ) ?? navigableChanges[0])
-      : undefined;
-  const selectedEntityId = selectedChange?.entityId;
-  const effectiveSelectedFilePath =
-    selectedFilePath ??
-    (selectedChange === undefined ? fileGroups[0]?.filePath : undefined);
-  const selectedEntityIndex = selectedChange
-    ? navigableChanges.findIndex(
-        (change) => change.entityId === selectedChange.entityId,
-      )
-    : -1;
   const fileQuery = useQuery({
-    queryKey: ["file-diff", activeRepoId, comparison, effectiveSelectedFilePath],
-    queryFn: () =>
-      getFileDiff(effectiveSelectedFilePath!, comparison, activeRepoId),
+    queryKey: ["file-diff", activeRepoId, comparison, fileDiffPath],
+    queryFn: () => getFileDiff(fileDiffPath!, comparison, activeRepoId),
     enabled:
       activeRepoId !== undefined &&
-      effectiveSelectedFilePath !== undefined &&
+      fileDiffPath !== undefined &&
       diff !== undefined,
   });
   const isRefreshing =
@@ -170,7 +181,7 @@ export function SemanticDiffViewer() {
 
   async function refreshDiff() {
     const refreshed = await query.refetch();
-    const filePathToRefresh = effectiveSelectedFilePath;
+    const filePathToRefresh = fileDiffPath;
 
     if (filePathToRefresh) {
       if (
@@ -197,8 +208,12 @@ export function SemanticDiffViewer() {
   }
 
   return (
-    <TooltipProvider>
-      <div className="flex h-dvh min-h-[520px] flex-col overflow-hidden bg-background">
+    <WorkerPoolContextProvider
+      poolOptions={DIFF_WORKER_POOL_OPTIONS}
+      highlighterOptions={DIFF_HIGHLIGHTER_OPTIONS}
+    >
+      <TooltipProvider>
+        <div className="flex h-dvh min-h-[520px] flex-col overflow-hidden bg-background">
         <header className="flex h-14 shrink-0 items-center gap-4 overflow-x-auto border-b bg-card px-4">
           <div className="flex min-w-0 shrink-0 items-center gap-4">
             <div className="flex items-center gap-2">
@@ -345,28 +360,27 @@ export function SemanticDiffViewer() {
                 ) : null}
                 {diff &&
                 fileGroups.length > 0 &&
-                (effectiveSelectedFilePath || selectedChange) ? (
+                effectiveSelectedFilePath &&
+                selectedFileGroup ? (
                   <ResizablePanelGroup orientation="horizontal">
                     <ResizablePanel
-                      defaultSize="27%"
+                      defaultSize="24%"
                       minSize="220px"
-                      maxSize="42%"
+                      maxSize="34%"
                     >
                       <DiffSidebar
                         changes={visibleChanges}
                         fileChanges={visibleFileChanges}
-                        selectedEntityId={selectedEntityId}
                         selectedFilePath={effectiveSelectedFilePath}
-                        onSelectEntity={selectEntity}
                         onSelectFile={selectFile}
                       />
                     </ResizablePanel>
                     <ResizableHandle />
-                    <ResizablePanel defaultSize="73%" minSize="480px">
-                      {effectiveSelectedFilePath && fileQuery.isPending ? (
+                    <ResizablePanel minSize="480px">
+                      {fileDiffPath && fileQuery.isPending ? (
                         <LoadingState />
                       ) : null}
-                      {effectiveSelectedFilePath &&
+                      {fileDiffPath &&
                       fileQuery.data &&
                       !fileQuery.data.ok ? (
                         <ErrorState
@@ -376,7 +390,7 @@ export function SemanticDiffViewer() {
                           title="Unable to load file diff"
                         />
                       ) : null}
-                      {effectiveSelectedFilePath &&
+                      {fileDiffPath &&
                       fileQuery.data?.ok &&
                       fileQuery.data.data.kind === "text" ? (
                         <FileDiffView
@@ -390,7 +404,7 @@ export function SemanticDiffViewer() {
                           comparison={comparison}
                         />
                       ) : null}
-                      {effectiveSelectedFilePath &&
+                      {fileDiffPath &&
                       fileQuery.data?.ok &&
                       fileQuery.data.data.kind === "binary" ? (
                         <BinaryFileView
@@ -400,7 +414,7 @@ export function SemanticDiffViewer() {
                           comparison={comparison}
                         />
                       ) : null}
-                      {!selectedFilePath && selectedChange ? (
+                      {selectedChange ? (
                         <EntityDiffView
                           key={`${selectedChange.entityId}:${diff.refreshedAt}`}
                           change={selectedChange}
@@ -427,6 +441,24 @@ export function SemanticDiffViewer() {
                         />
                       ) : null}
                     </ResizablePanel>
+                    <ResizableHandle />
+                    <ResizablePanel
+                      defaultSize="240px"
+                      minSize="190px"
+                      maxSize="360px"
+                      groupResizeBehavior="preserve-pixel-size"
+                      collapsible
+                      collapsedSize="0px"
+                    >
+                      <EntityPanel
+                        fileGroup={selectedFileGroup}
+                        selectedEntityId={selectedEntityId}
+                        onSelectFullFile={() =>
+                          selectFile(effectiveSelectedFilePath)
+                        }
+                        onSelectEntity={selectEntity}
+                      />
+                    </ResizablePanel>
                   </ResizablePanelGroup>
                 ) : null}
               </div>
@@ -446,7 +478,8 @@ export function SemanticDiffViewer() {
             </span>
           ) : null}
         </footer>
-      </div>
-    </TooltipProvider>
+        </div>
+      </TooltipProvider>
+    </WorkerPoolContextProvider>
   );
 }

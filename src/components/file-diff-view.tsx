@@ -128,7 +128,6 @@ export function FileDiffView({
                     overflow: "scroll",
                     disableFileHeader: true,
                   }}
-                  disableWorkerPool
                 />
               </div>
               <DiffHorizontalScrollbars

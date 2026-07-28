@@ -188,7 +188,6 @@ export function EntityDiffView({
                 overflow: "scroll",
                 disableFileHeader: true,
               }}
-              disableWorkerPool
             />
           </div>
           <DiffHorizontalScrollbars
