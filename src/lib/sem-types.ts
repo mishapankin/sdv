@@ -53,7 +53,7 @@ export const binaryChangeSchema = z.object({
 });
 
 export const fileOnlyChangeSchema = z.object({
-  changeType: z.enum(["binary", "untracked"]),
+  changeType: z.enum(["binary", "tracked", "untracked"]),
   filePath: z.string(),
   oldFilePath: z.string().nullable().optional(),
   fileStatus: fileStatusSchema,

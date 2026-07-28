@@ -1,6 +1,10 @@
 "use client";
 
-import { skipToken, useQuery } from "@tanstack/react-query";
+import {
+  skipToken,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { WorkerPoolContextProvider } from "@pierre/diffs/react";
 import {
   CirclePlus,
@@ -57,6 +61,11 @@ import {
   resolveDiffSelection,
   type DiffSelection,
 } from "@/lib/diff-selection";
+import {
+  getFileDiffQueryKey,
+  invalidateFileDiffQueries,
+  removeFileDiffQueries,
+} from "@/lib/diff-query";
 import { groupByFile, hasFileInDiff } from "@/lib/group-changes";
 import { mergeModuleLevelChanges } from "@/lib/merge-module-changes";
 import type { FileOnlyChange } from "@/lib/sem-types";
@@ -77,6 +86,7 @@ const DIFF_HIGHLIGHTER_OPTIONS = {
 
 export function SemanticDiffViewer() {
   const theme = useTheme();
+  const queryClient = useQueryClient();
   const [selection, setSelection] = useState<DiffSelection | null>(null);
   const repositoriesQuery = useQuery({
     queryKey: ["workspace-repositories"],
@@ -143,7 +153,10 @@ export function SemanticDiffViewer() {
     [fileGroups, selection],
   );
   const fileQuery = useQuery({
-    queryKey: ["file-diff", activeRepoId, comparison, fileDiffPath],
+    queryKey:
+      activeRepoId === undefined
+        ? ["file-diff", "unavailable"]
+        : getFileDiffQueryKey(activeRepoId, comparison, fileDiffPath),
     queryFn:
       activeRepoId !== undefined &&
       fileDiffPath !== undefined &&
@@ -165,23 +178,27 @@ export function SemanticDiffViewer() {
     const refreshed = await query.refetch();
     const filePathToRefresh = fileDiffPath;
 
-    if (filePathToRefresh) {
-      if (
-        selection?.type === "file" &&
-        refreshed.data?.ok &&
-        !hasFileInDiff(
-          filePathToRefresh,
-          refreshed.data.data.changes,
-          refreshed.data.data.fileChanges,
-        )
-      ) {
-        setSelection(null);
-        return;
-      }
+    if (!refreshed.data?.ok || activeRepoId === undefined) return;
 
-      if (!refreshed.data?.ok) return;
-      await fileQuery.refetch();
+    if (
+      filePathToRefresh &&
+      selection?.type === "file" &&
+      !hasFileInDiff(
+        filePathToRefresh,
+        refreshed.data.data.changes,
+        refreshed.data.data.fileChanges,
+      )
+    ) {
+      removeFileDiffQueries(queryClient, activeRepoId, comparison);
+      setSelection(null);
+      return;
     }
+
+    await invalidateFileDiffQueries(
+      queryClient,
+      activeRepoId,
+      comparison,
+    );
   }
 
   async function refreshAll() {

@@ -7,7 +7,7 @@ import {
   readSemanticDiffFromRepository,
 } from "@/lib/sem";
 
-const fixtureUrl = new URL("./fixtures/sem-0.7-verbose.json", import.meta.url);
+const fixtureUrl = new URL("./fixtures/sem-verbose.json", import.meta.url);
 
 function createRunner(semOutput: string): CommandRunner {
   return vi.fn(async (command, args) => {
@@ -27,12 +27,16 @@ function createRunner(semOutput: string): CommandRunner {
       return { stdout: "", stderr: "" };
     }
 
+    if (args[0] === "diff" && args.includes("--name-status")) {
+      return { stdout: "", stderr: "" };
+    }
+
     throw new Error(`unexpected command: ${command} ${args.join(" ")}`);
   });
 }
 
 describe("sem process boundary", () => {
-  it("accepts representative sem 0.7 verbose JSON change variants", async () => {
+  it("accepts representative verbose JSON change variants", async () => {
     const fixture = await readFile(fixtureUrl, "utf8");
     const runner = createRunner(fixture);
     const result = await readSemanticDiffFromRepository(
@@ -97,6 +101,60 @@ describe("sem process boundary", () => {
     } finally {
       consoleError.mockRestore();
     }
+  });
+
+  it("includes tracked files reported by Git even without semantic changes", async () => {
+    const runner: CommandRunner = vi.fn(async (command, args) => {
+      if (command === "sem") {
+        return {
+          stdout:
+            '{"summary":{"fileCount":0,"added":0,"modified":0,"deleted":0,"moved":0,"renamed":0,"reordered":0,"binary":0,"orphan":0,"total":0},"changes":[],"binaryChanges":[]}',
+          stderr: "",
+        };
+      }
+
+      if (args[0] === "branch") {
+        return { stdout: "main\n", stderr: "" };
+      }
+
+      if (args[0] === "rev-parse") {
+        return { stdout: "/tmp/example\n", stderr: "" };
+      }
+
+      if (args[0] === "diff" && args.includes("--numstat")) {
+        return { stdout: "", stderr: "" };
+      }
+
+      if (args[0] === "diff" && args.includes("--name-status")) {
+        return { stdout: "M\0notes.md\0", stderr: "" };
+      }
+
+      throw new Error(`unexpected command: ${command} ${args.join(" ")}`);
+    });
+    const result = await readSemanticDiffFromRepository(
+      { mode: "staged" },
+      "/tmp/example",
+      runner,
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      data: {
+        fileChanges: [
+          {
+            changeType: "tracked",
+            filePath: "notes.md",
+            oldFilePath: "notes.md",
+            fileStatus: "modified",
+          },
+        ],
+        gitSummary: {
+          fileCount: 1,
+          additions: 0,
+          deletions: 0,
+        },
+      },
+    });
   });
 
   it("surfaces sem command failures", async () => {

@@ -171,6 +171,24 @@ type GitChangedFile = {
   status: string;
 };
 
+function getFileStatusFromGitStatus(
+  status: string,
+): FileOnlyChange["fileStatus"] {
+  if (status === "A" || status === "C") return "added";
+  if (status === "D") return "deleted";
+  if (status === "R") return "renamed";
+  return "modified";
+}
+
+function getTrackedFileChanges(files: GitChangedFile[]): FileOnlyChange[] {
+  return files.map((file) => ({
+    changeType: "tracked",
+    filePath: file.filePath,
+    oldFilePath: file.oldFilePath,
+    fileStatus: getFileStatusFromGitStatus(file.status),
+  }));
+}
+
 function parseGitNameStatus(stdout: string): GitChangedFile[] {
   const fields = stdout.split("\0").filter(Boolean);
   const files: GitChangedFile[] = [];
@@ -297,13 +315,15 @@ export async function readSemanticDiffFromRepository(
       { stdout },
       branchResult,
       rootResult,
-      trackedGitSummary,
+      trackedNumstat,
+      trackedFiles,
       untrackedData,
     ] = await Promise.all([
       execute("sem", getSemDiffArgs(resolvedComparison), cwd),
       execute("git", ["branch", "--show-current"], cwd),
       execute("git", ["rev-parse", "--show-toplevel"], cwd),
       readGitDiffSummary(resolvedComparison, cwd, execute),
+      readChangedFiles(getGitDiffArgs(resolvedComparison), cwd, execute),
       shouldIncludeUntracked
         ? readUntrackedFileData(cwd, execute)
         : Promise.resolve({
@@ -335,17 +355,29 @@ export async function readSemanticDiffFromRepository(
       };
     }
 
+    const binaryFilePaths = new Set(
+      parsed.data.binaryChanges.map((change) => change.filePath),
+    );
+    const trackedFileChanges = getTrackedFileChanges(trackedFiles).map(
+      (change): FileOnlyChange =>
+        binaryFilePaths.has(change.filePath)
+          ? { ...change, changeType: "binary" }
+          : change,
+    );
+
     return {
       ok: true,
       data: {
         ...parsed.data,
         fileChanges: [
-          ...parsed.data.fileChanges,
-          ...parsed.data.binaryChanges,
+          ...trackedFileChanges,
           ...untrackedData.changes,
         ],
         gitSummary: addGitDiffSummaries(
-          trackedGitSummary,
+          {
+            ...trackedNumstat,
+            fileCount: trackedFiles.length,
+          },
           untrackedData.summary,
         ),
         repositoryName: path.basename(rootResult.stdout.trim()),

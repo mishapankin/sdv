@@ -24,9 +24,10 @@ file status, while `sem` supplies semantic entity details where it can.
   between two user-provided Git refs.
 - Refresh reruns `sem` and refreshes Git file status; do not maintain a
   separate diff cache.
-- The sidebar is grouped by file. Files with semantic changes list their changed
-  semantic entities with a Lucide icon for entity type and a label/icon for
-  change type such as added, modified, deleted, moved, renamed, or reordered.
+- The left sidebar is grouped by file. A separate right sidebar lists the
+  selected file's changed semantic entities with a Lucide icon for entity type
+  and a label/icon for change type such as added, modified, deleted, moved,
+  renamed, or reordered.
 - Untracked files are shown for the default Changed comparison as file-level
   Git changes. They do not have semantic entities unless `sem` returns them.
 - macOS and Linux are the supported platforms for the MVP.
@@ -84,9 +85,9 @@ layer, database, authentication system, or Git abstraction.
 - Use shadcn components where they improve keyboard behavior or accessibility,
   especially buttons, selects, tooltips, resizable panels, scroll areas, and
   dialogs/popovers.
-- The main layout is a file/entity sidebar and a large semantic entity diff
-  pane. Preserve useful space for code; avoid decorative UI and excessive
-  cards.
+- The main layout is a file sidebar, a large semantic entity diff pane, and a
+  right sidebar for entities in the selected file. Preserve useful space for
+  code; avoid decorative UI and excessive cards.
 - Provide clear empty, loading, refresh, missing-`sem`, invalid-repository, and
   command-failure states.
 
@@ -95,5 +96,6 @@ layer, database, authentication system, or Git abstraction.
 - Run `pnpm build`.
 - Run lint and focused tests for argument construction, JSON validation,
   file/entity grouping, and process errors.
-- Verify the UI against real `sem 0.7.x` verbose JSON, including added,
-  modified, deleted, moved, and renamed entities where fixtures permit.
+- Verify the UI against real verbose JSON from the latest supported `sem`
+  release, including added, modified, deleted, moved, and renamed entities
+  where fixtures permit.
