@@ -85,28 +85,26 @@ function FileNode({
     : node.path;
 
   return (
-    <div
+    <button
+      type="button"
+      onClick={() => onSelectFile(node.path)}
       className={cn(
-        "flex h-7 items-center pr-2 transition-colors hover:bg-sidebar-accent",
+        "flex h-7 w-full items-center pr-2 text-left transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50",
         selectedFilePath === node.path &&
           "bg-card text-foreground shadow-xs",
       )}
       style={rowPadding(depth)}
+      title={fileTitle}
     >
       <span className="size-5 shrink-0" aria-hidden="true" />
-      <button
-        type="button"
-        onClick={() => onSelectFile(node.path)}
-        className="grid min-w-0 flex-1 grid-cols-[1rem_minmax(0,1fr)_1.25rem] items-center gap-x-1.5 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-        title={fileTitle}
-      >
+      <span className="grid min-w-0 flex-1 grid-cols-[1rem_minmax(0,1fr)_1.25rem] items-center gap-x-1.5">
         <FileTypeIcon filePath={node.path} className="size-4 shrink-0" />
         <span className="min-w-0 truncate text-xs font-medium">
           {node.name}
         </span>
         <ChangeBadge changeType={node.group.changeType} />
-      </button>
-    </div>
+      </span>
+    </button>
   );
 }
 
