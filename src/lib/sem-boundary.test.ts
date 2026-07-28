@@ -23,6 +23,10 @@ function createRunner(semOutput: string): CommandRunner {
       return { stdout: "/tmp/example\n", stderr: "" };
     }
 
+    if (args[0] === "diff" && args.includes("--numstat")) {
+      return { stdout: "", stderr: "" };
+    }
+
     throw new Error(`unexpected command: ${command} ${args.join(" ")}`);
   });
 }
@@ -56,6 +60,11 @@ describe("sem process boundary", () => {
     ]);
     expect(result.data.binaryChanges).toEqual([]);
     expect(result.data.fileChanges).toEqual([]);
+    expect(result.data.gitSummary).toEqual({
+      fileCount: 0,
+      additions: 0,
+      deletions: 0,
+    });
     expect(result.data.repositoryName).toBe("example");
     expect(result.data.branchName).toBe("main");
   });

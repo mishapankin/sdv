@@ -75,31 +75,6 @@ const DIFF_HIGHLIGHTER_OPTIONS = {
   lineDiffType: "word-alt" as const,
 };
 
-function SummaryStat({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number;
-  tone?: "positive" | "negative";
-}) {
-  if (!value) return null;
-
-  return (
-    <span
-      className={cn(
-        "font-mono text-xs",
-        tone === "positive" && "text-emerald-700",
-        tone === "negative" && "text-rose-700",
-        !tone && "text-muted-foreground",
-      )}
-    >
-      {value} {label}
-    </span>
-  );
-}
-
 export function SemanticDiffViewer() {
   const theme = useTheme();
   const [selection, setSelection] = useState<DiffSelection | null>(null);
@@ -292,33 +267,22 @@ export function SemanticDiffViewer() {
 
           <div className="ml-auto flex shrink-0 items-center gap-3">
             {diff ? (
-              <div className="hidden items-center gap-3 md:flex">
-                <SummaryStat
-                  label="added"
-                  value={
-                    visibleChanges.filter(
-                      (change) => change.changeType === "added",
-                    ).length
-                  }
-                  tone="positive"
-                />
-                <SummaryStat
-                  label="modified"
-                  value={
-                    visibleChanges.filter(
-                      (change) => change.changeType === "modified",
-                    ).length
-                  }
-                />
-                <SummaryStat
-                  label="deleted"
-                  value={
-                    visibleChanges.filter(
-                      (change) => change.changeType === "deleted",
-                    ).length
-                  }
-                  tone="negative"
-                />
+              <div
+                className="hidden items-center gap-2 font-mono text-xs md:flex"
+                aria-label={`${diff.gitSummary.fileCount} files changed, ${diff.gitSummary.additions} additions, ${diff.gitSummary.deletions} deletions`}
+              >
+                <span className="text-muted-foreground">
+                  {diff.gitSummary.fileCount}{" "}
+                  {diff.gitSummary.fileCount === 1
+                    ? "file changed"
+                    : "files changed"}
+                </span>
+                <span className="font-medium text-emerald-700 dark:text-emerald-400">
+                  +{diff.gitSummary.additions}
+                </span>
+                <span className="font-medium text-rose-700 dark:text-rose-400">
+                  −{diff.gitSummary.deletions}
+                </span>
               </div>
             ) : null}
             <Tooltip>

@@ -22,6 +22,9 @@ export function EntityPanel({
   onSelectEntity: (entityId: string) => void;
 }) {
   const fileName = fileGroup.filePath.split("/").at(-1) ?? fileGroup.filePath;
+  const isFullFileSelected = selectedEntityId === undefined;
+  const selectedRowClass =
+    "bg-sky-500/10 text-foreground shadow-xs ring-1 ring-inset ring-sky-600/20 before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:rounded-full before:bg-sky-600 dark:bg-sky-400/10 dark:ring-sky-400/25 dark:before:bg-sky-400";
 
   return (
     <aside className="flex h-full min-w-0 flex-col bg-sidebar/60">
@@ -41,26 +44,32 @@ export function EntityPanel({
             {fileName}
           </div>
         </div>
-        <Badge
-          variant="secondary"
-          className="h-5 rounded-md px-1.5 font-mono text-[10px]"
-        >
-          {fileGroup.changes.length}
-        </Badge>
       </div>
 
       <ScrollArea className="min-h-0 flex-1">
-        <nav aria-label={`Changes in ${fileGroup.filePath}`} className="py-2">
+        <nav
+          aria-label={`Views and changes in ${fileGroup.filePath}`}
+          className="py-3"
+        >
+          <div className="px-3 pb-1.5 text-[9px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
+            File view
+          </div>
           <button
             type="button"
             onClick={onSelectFullFile}
+            aria-current={isFullFileSelected ? "page" : undefined}
             className={cn(
-              "flex h-10 w-full items-center gap-2 px-3 text-left transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50",
-              selectedEntityId === undefined &&
-                "bg-card text-foreground shadow-xs",
+              "relative mx-2 flex h-12 w-[calc(100%_-_1rem)] items-center gap-2 rounded-md px-2.5 text-left transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50",
+              isFullFileSelected && selectedRowClass,
             )}
           >
-            <FileCode2 className="size-4 shrink-0 text-muted-foreground" />
+            <FileCode2
+              className={cn(
+                "size-4 shrink-0 text-muted-foreground",
+                isFullFileSelected &&
+                  "text-sky-700 dark:text-sky-300",
+              )}
+            />
             <span className="min-w-0 flex-1">
               <span className="block truncate text-xs font-medium">
                 Full file diff
@@ -71,21 +80,40 @@ export function EntityPanel({
             </span>
           </button>
 
+          <div className="mt-3 flex items-center justify-between border-t px-3 pt-3 pb-1.5">
+            <span className="text-[9px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
+              Semantic entities
+            </span>
+            <Badge
+              variant="secondary"
+              className="h-5 rounded-md px-1.5 font-mono text-[9px]"
+            >
+              {fileGroup.changes.length}
+            </Badge>
+          </div>
+
           {fileGroup.changes.map((change) => (
             <button
               key={change.entityId}
               type="button"
               onClick={() => onSelectEntity(change.entityId)}
+              aria-current={
+                selectedEntityId === change.entityId ? "page" : undefined
+              }
               className={cn(
-                "flex h-10 w-full items-center gap-2 px-3 text-left transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50",
+                "relative mx-2 flex h-11 w-[calc(100%_-_1rem)] items-center gap-2 rounded-md px-2.5 text-left transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50",
                 selectedEntityId === change.entityId &&
-                  "bg-card text-foreground shadow-xs",
+                  selectedRowClass,
               )}
               title={`${change.entityType}: ${change.entityName || "(anonymous)"}`}
             >
               <EntityIcon
                 entityType={change.entityType}
-                className="size-4 shrink-0 text-muted-foreground"
+                className={cn(
+                  "size-4 shrink-0 text-muted-foreground",
+                  selectedEntityId === change.entityId &&
+                    "text-sky-700 dark:text-sky-300",
+                )}
               />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-xs font-medium">
@@ -102,7 +130,7 @@ export function EntityPanel({
         </nav>
 
         {fileGroup.changes.length === 0 ? (
-          <p className="px-3 py-4 text-xs leading-5 text-muted-foreground">
+          <p className="px-3 py-3 text-xs leading-5 text-muted-foreground">
             No semantic entity changes were reported for this file.
           </p>
         ) : null}

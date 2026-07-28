@@ -12,6 +12,11 @@ import {
 } from "@/lib/git-arguments";
 import { resolveCommit } from "@/lib/git-ref";
 import {
+  addGitDiffSummaries,
+  countTextLines,
+  parseGitNumstat,
+} from "@/lib/git-stats";
+import {
   type Comparison,
   type FileOnlyChange,
   semDiffSchema,
@@ -101,18 +106,63 @@ async function readUntrackedFiles(
   return stdout.split("\0").filter(Boolean);
 }
 
-async function readUntrackedFileChanges(
+async function readUntrackedFileData(
   cwd: string,
   execute: CommandRunner = run,
-): Promise<FileOnlyChange[]> {
+): Promise<{
+  changes: FileOnlyChange[];
+  summary: { fileCount: number; additions: number; deletions: number };
+}> {
   const files = await readUntrackedFiles(cwd, execute);
+  const contents = await Promise.all(
+    files.map((filePath) =>
+      readWorkingTreeFile(cwd, filePath).catch(() => ({
+        content: "",
+        binary: true,
+      })),
+    ),
+  );
 
-  return files.map((filePath) => ({
-    changeType: "untracked" as const,
-    filePath,
-    oldFilePath: null,
-    fileStatus: "added" as const,
-  }));
+  return {
+    changes: files.map((filePath) => ({
+      changeType: "untracked" as const,
+      filePath,
+      oldFilePath: null,
+      fileStatus: "added" as const,
+    })),
+    summary: {
+      fileCount: files.length,
+      additions: contents.reduce(
+        (total, file) =>
+          total + (file.binary ? 0 : countTextLines(file.content)),
+        0,
+      ),
+      deletions: 0,
+    },
+  };
+}
+
+async function readGitDiffSummary(
+  comparison: ResolvedComparison,
+  cwd: string,
+  execute: CommandRunner = run,
+) {
+  const [, ...comparisonArgs] = getGitDiffArgs(comparison);
+  const { stdout } = await execute(
+    "git",
+    [
+      "diff",
+      "--numstat",
+      "-z",
+      "--find-renames",
+      "--no-ext-diff",
+      "--no-textconv",
+      ...comparisonArgs,
+    ],
+    cwd,
+  );
+
+  return parseGitNumstat(stdout);
 }
 
 type GitChangedFile = {
@@ -243,15 +293,24 @@ export async function readSemanticDiffFromRepository(
       execute,
     );
     const shouldIncludeUntracked = resolvedComparison.mode === "changed";
-    const [{ stdout }, branchResult, rootResult, untrackedChanges] =
-      await Promise.all([
-        execute("sem", getSemDiffArgs(resolvedComparison), cwd),
-        execute("git", ["branch", "--show-current"], cwd),
-        execute("git", ["rev-parse", "--show-toplevel"], cwd),
-        shouldIncludeUntracked
-          ? readUntrackedFileChanges(cwd, execute)
-          : Promise.resolve([]),
-      ]);
+    const [
+      { stdout },
+      branchResult,
+      rootResult,
+      trackedGitSummary,
+      untrackedData,
+    ] = await Promise.all([
+      execute("sem", getSemDiffArgs(resolvedComparison), cwd),
+      execute("git", ["branch", "--show-current"], cwd),
+      execute("git", ["rev-parse", "--show-toplevel"], cwd),
+      readGitDiffSummary(resolvedComparison, cwd, execute),
+      shouldIncludeUntracked
+        ? readUntrackedFileData(cwd, execute)
+        : Promise.resolve({
+            changes: [],
+            summary: { fileCount: 0, additions: 0, deletions: 0 },
+          }),
+    ]);
     let json: unknown;
 
     try {
@@ -283,8 +342,12 @@ export async function readSemanticDiffFromRepository(
         fileChanges: [
           ...parsed.data.fileChanges,
           ...parsed.data.binaryChanges,
-          ...untrackedChanges,
+          ...untrackedData.changes,
         ],
+        gitSummary: addGitDiffSummaries(
+          trackedGitSummary,
+          untrackedData.summary,
+        ),
         repositoryName: path.basename(rootResult.stdout.trim()),
         branchName: branchResult.stdout.trim() || "detached HEAD",
         refreshedAt: new Date().toISOString(),

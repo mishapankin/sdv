@@ -84,10 +84,17 @@ export type BinaryChange = z.infer<typeof binaryChangeSchema>;
 export type FileOnlyChange = z.infer<typeof fileOnlyChangeSchema>;
 export type SemDiff = z.infer<typeof semDiffSchema>;
 
+export type GitDiffSummary = {
+  fileCount: number;
+  additions: number;
+  deletions: number;
+};
+
 export type SemanticDiffResult =
   | {
       ok: true;
       data: SemDiff & {
+        gitSummary: GitDiffSummary;
         repositoryName: string;
         branchName: string;
         refreshedAt: string;
