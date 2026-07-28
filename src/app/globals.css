@@ -137,7 +137,8 @@
   background: oklch(0.83 0.06 250 / 45%);
 }
 
-.diff-proxy-scrollbar {
+.diff-proxy-scrollbar,
+.diff-view-scrollbar {
   scrollbar-color: color-mix(in oklab, var(--muted-foreground) 48%, transparent)
     transparent;
   scrollbar-width: thin;
@@ -147,12 +148,17 @@
   height: 0.625rem;
 }
 
-.diff-proxy-scrollbar::-webkit-scrollbar-track {
+.diff-view-scrollbar::-webkit-scrollbar {
+  width: 0.625rem;
+}
+
+.diff-proxy-scrollbar::-webkit-scrollbar-track,
+.diff-view-scrollbar::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.diff-proxy-scrollbar::-webkit-scrollbar-thumb {
-  min-width: 2.5rem;
+.diff-proxy-scrollbar::-webkit-scrollbar-thumb,
+.diff-view-scrollbar::-webkit-scrollbar-thumb {
   border: 0.1875rem solid transparent;
   border-radius: 999px;
   background: color-mix(
@@ -163,11 +169,24 @@
   background-clip: padding-box;
 }
 
-.diff-proxy-scrollbar::-webkit-scrollbar-thumb:hover {
+.diff-proxy-scrollbar::-webkit-scrollbar-thumb {
+  min-width: 2.5rem;
+}
+
+.diff-view-scrollbar::-webkit-scrollbar-thumb {
+  min-height: 2.5rem;
+}
+
+.diff-proxy-scrollbar::-webkit-scrollbar-thumb:hover,
+.diff-view-scrollbar::-webkit-scrollbar-thumb:hover {
   background: color-mix(
     in oklab,
     var(--foreground) 58%,
     transparent
   );
   background-clip: padding-box;
+}
+
+.diff-view-scrollbar::-webkit-scrollbar-corner {
+  background: transparent;
 }

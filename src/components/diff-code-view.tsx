@@ -11,6 +11,19 @@ import { useMemo, type RefObject } from "react";
 import { DiffHorizontalScrollbars } from "@/components/diff-navigation";
 import { shouldExpandUnchanged } from "@/lib/diff-rendering";
 
+const HIDE_INTERNAL_HORIZONTAL_SCROLLBAR_CSS = `
+  [data-code] {
+    scrollbar-gutter: auto;
+    scrollbar-width: none;
+    padding-bottom: var(--diffs-gap-block, var(--diffs-gap-fallback));
+  }
+
+  [data-code]::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
+`;
+
 export function DiffCodeView({
   codeViewRef,
   containerRef,
@@ -37,7 +50,7 @@ export function DiffCodeView({
         ref={codeViewRef}
         containerRef={containerRef}
         items={items}
-        className="min-h-0 shrink overflow-y-auto rounded-lg border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
+        className="diff-view-scrollbar min-h-0 shrink overflow-y-auto rounded-lg border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
         options={{
           diffStyle: "split",
           diffIndicators: "bars",
@@ -46,6 +59,7 @@ export function DiffCodeView({
           overflow: "scroll",
           disableFileHeader: true,
           expandUnchanged: shouldExpandUnchanged(fileDiff),
+          unsafeCSS: HIDE_INTERNAL_HORIZONTAL_SCROLLBAR_CSS,
           layout: { paddingTop: 0, paddingBottom: 0, gap: 0 },
         }}
       />
