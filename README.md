@@ -1,5 +1,7 @@
 # Semantic Diff Viewer
 
+![Showcase](assets/showcase.png)
+
 A local browser UI for Git worktree diffs with entity-level semantic details
 from [`sem`](https://github.com/ataraxy-labs/sem).
 
