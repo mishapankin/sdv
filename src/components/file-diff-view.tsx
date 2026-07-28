@@ -14,6 +14,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { getComparisonLabel } from "@/lib/comparison";
+import { shouldExpandUnchanged } from "@/lib/diff-rendering";
 import type { Comparison } from "@/lib/sem-types";
 
 export function FileDiffView({
@@ -127,6 +128,7 @@ export function FileDiffView({
                     theme: theme === "dark" ? "pierre-dark" : "pierre-light",
                     overflow: "scroll",
                     disableFileHeader: true,
+                    expandUnchanged: shouldExpandUnchanged(fileDiff),
                   }}
                 />
               </div>

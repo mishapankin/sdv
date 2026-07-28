@@ -18,6 +18,7 @@ import {
 import { EntityIcon } from "@/components/entity-icons";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { shouldExpandUnchanged } from "@/lib/diff-rendering";
 import type { SemanticChange } from "@/lib/sem-types";
 import { cn } from "@/lib/utils";
 
@@ -187,6 +188,7 @@ export function EntityDiffView({
                 theme: theme === "dark" ? "pierre-dark" : "pierre-light",
                 overflow: "scroll",
                 disableFileHeader: true,
+                expandUnchanged: shouldExpandUnchanged(fileDiff),
               }}
             />
           </div>
