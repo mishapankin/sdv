@@ -1,20 +1,19 @@
 "use client";
 
 import { parseDiffFromFile } from "@pierre/diffs";
-import { FileDiff } from "@pierre/diffs/react";
+import type { CodeViewHandle } from "@pierre/diffs/react";
 import { FileCode2 } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
 
+import { DiffCodeView } from "@/components/diff-code-view";
 import {
-  DiffHorizontalScrollbars,
   HunkNavigation,
   shouldIgnoreNavigationKey,
   useHunkNavigation,
 } from "@/components/diff-navigation";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { getComparisonLabel } from "@/lib/comparison";
-import { shouldExpandUnchanged } from "@/lib/diff-rendering";
+import type { DiffLineTarget } from "@/lib/diff-selection";
 import type { Comparison } from "@/lib/sem-types";
 
 export function FileDiffView({
@@ -25,6 +24,7 @@ export function FileDiffView({
   cacheKey,
   theme,
   comparison,
+  target,
 }: {
   filePath: string;
   oldFilePath: string;
@@ -33,6 +33,7 @@ export function FileDiffView({
   cacheKey: string;
   theme: "light" | "dark";
   comparison: Comparison;
+  target?: DiffLineTarget;
 }) {
   const fileDiff = useMemo(
     () => {
@@ -56,8 +57,27 @@ export function FileDiffView({
     },
     [cacheKey, filePath, newContent, oldContent, oldFilePath],
   );
+  const itemId = `file:${filePath}`;
+  const codeViewRef = useRef<CodeViewHandle<undefined>>(null);
   const diffRootRef = useRef<HTMLDivElement>(null);
-  const hunkNavigation = useHunkNavigation(fileDiff?.hunks ?? [], diffRootRef);
+  const hunkNavigation = useHunkNavigation(
+    fileDiff?.hunks ?? [],
+    codeViewRef,
+    itemId,
+  );
+
+  useEffect(() => {
+    if (!target || !fileDiff) return;
+
+    codeViewRef.current?.scrollTo({
+      type: "line",
+      id: itemId,
+      lineNumber: target.lineNumber,
+      side: target.side,
+      align: "center",
+      behavior: "instant",
+    });
+  }, [fileDiff, itemId, target]);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -111,40 +131,23 @@ export function FileDiffView({
         />
       </div>
 
-      <ScrollArea className="min-h-0 flex-1">
-        <div className="p-5">
-          {fileDiff ? (
-            <>
-              <div
-                ref={diffRootRef}
-                className="overflow-hidden rounded-lg border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
-              >
-                <FileDiff
-                  fileDiff={fileDiff}
-                  options={{
-                    diffStyle: "split",
-                    diffIndicators: "bars",
-                    lineDiffType: "word-alt",
-                    theme: theme === "dark" ? "pierre-dark" : "pierre-light",
-                    overflow: "scroll",
-                    disableFileHeader: true,
-                    expandUnchanged: shouldExpandUnchanged(fileDiff),
-                  }}
-                />
-              </div>
-              <DiffHorizontalScrollbars
-                diffRootRef={diffRootRef}
-                syncKey={cacheKey}
-              />
-            </>
-          ) : (
-            <div className="rounded-lg border bg-card p-6 text-sm text-muted-foreground">
-              No line changes in this file for{" "}
-              {getComparisonLabel(comparison).toLowerCase()}.
-            </div>
-          )}
+      {fileDiff ? (
+        <DiffCodeView
+          codeViewRef={codeViewRef}
+          containerRef={diffRootRef}
+          fileDiff={fileDiff}
+          itemId={itemId}
+          theme={theme}
+          syncKey={cacheKey}
+        />
+      ) : (
+        <div className="min-h-0 flex-1 p-5">
+          <div className="rounded-lg border bg-card p-6 text-sm text-muted-foreground">
+            No line changes in this file for{" "}
+            {getComparisonLabel(comparison).toLowerCase()}.
+          </div>
         </div>
-      </ScrollArea>
+      )}
     </main>
   );
 }

@@ -4,21 +4,21 @@ import {
   parseDiffFromFile,
   type FileDiffMetadata,
 } from "@pierre/diffs";
-import { FileDiff } from "@pierre/diffs/react";
-import { ArrowRight, Sparkles } from "lucide-react";
+import type { CodeViewHandle } from "@pierre/diffs/react";
+import { ArrowRight, Maximize2, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
 
 import { changeStyles } from "@/components/change-badge";
+import { DiffCodeView } from "@/components/diff-code-view";
 import {
-  DiffHorizontalScrollbars,
   HunkNavigation,
   shouldIgnoreNavigationKey,
   useHunkNavigation,
 } from "@/components/diff-navigation";
 import { EntityIcon } from "@/components/entity-icons";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { shouldExpandUnchanged } from "@/lib/diff-rendering";
+import { Button } from "@/components/ui/button";
+import type { DiffLineTarget } from "@/lib/diff-selection";
 import type { SemanticChange } from "@/lib/sem-types";
 import { cn } from "@/lib/utils";
 
@@ -58,22 +58,27 @@ export function EntityDiffView({
   renderVersion,
   onPreviousEntity,
   onNextEntity,
+  onViewInContext,
 }: {
   change: SemanticChange;
   theme: "light" | "dark";
   renderVersion: string;
   onPreviousEntity?: () => void;
   onNextEntity?: () => void;
+  onViewInContext: (target?: DiffLineTarget) => void;
 }) {
   const status = changeStyles[change.changeType];
   const fileDiff = useMemo(
     () => createEntityFileDiff(change, renderVersion),
     [change, renderVersion],
   );
+  const itemId = `entity:${change.entityId}`;
+  const codeViewRef = useRef<CodeViewHandle<undefined>>(null);
   const diffRootRef = useRef<HTMLDivElement>(null);
   const hunkNavigation = useHunkNavigation(
     fileDiff.hunks,
-    diffRootRef,
+    codeViewRef,
+    itemId,
   );
 
   useEffect(() => {
@@ -166,6 +171,28 @@ export function EntityDiffView({
               cosmetic
             </span>
           ) : null}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              const lineNumber = change.startLine ?? change.oldStartLine;
+
+              onViewInContext(
+                lineNumber
+                  ? {
+                      lineNumber,
+                      side:
+                        change.startLine != null
+                          ? "additions"
+                          : "deletions",
+                    }
+                  : undefined,
+              );
+            }}
+          >
+            <Maximize2 />
+            View in context
+          </Button>
           <HunkNavigation
             hunks={fileDiff.hunks}
             {...hunkNavigation}
@@ -173,31 +200,14 @@ export function EntityDiffView({
         </div>
       </div>
 
-      <ScrollArea className="min-h-0 flex-1">
-        <div className="p-5">
-          <div
-            ref={diffRootRef}
-            className="overflow-hidden rounded-lg border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
-          >
-            <FileDiff
-              fileDiff={fileDiff}
-              options={{
-                diffStyle: "split",
-                diffIndicators: "bars",
-                lineDiffType: "word-alt",
-                theme: theme === "dark" ? "pierre-dark" : "pierre-light",
-                overflow: "scroll",
-                disableFileHeader: true,
-                expandUnchanged: shouldExpandUnchanged(fileDiff),
-              }}
-            />
-          </div>
-          <DiffHorizontalScrollbars
-            diffRootRef={diffRootRef}
-            syncKey={`${change.entityId}:${renderVersion}`}
-          />
-        </div>
-      </ScrollArea>
+      <DiffCodeView
+        codeViewRef={codeViewRef}
+        containerRef={diffRootRef}
+        fileDiff={fileDiff}
+        itemId={itemId}
+        theme={theme}
+        syncKey={`${change.entityId}:${renderVersion}`}
+      />
     </main>
   );
 }

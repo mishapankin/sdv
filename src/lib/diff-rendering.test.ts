@@ -19,17 +19,17 @@ function createChangedFileDiff(lineCount: number) {
 }
 
 describe("shouldExpandUnchanged", () => {
-  it("expands a diff whose larger side has exactly 30 lines", () => {
-    expect(shouldExpandUnchanged(createChangedFileDiff(30))).toBe(true);
+  it("expands a diff whose larger side has exactly 50 lines", () => {
+    expect(shouldExpandUnchanged(createChangedFileDiff(50))).toBe(true);
   });
 
-  it("keeps unchanged lines collapsed when either side exceeds 30 lines", () => {
+  it("keeps unchanged lines collapsed when either side exceeds 50 lines", () => {
     const fileDiff = parseDiffFromFile(
       { name: "example.ts", contents: "old line" },
       {
         name: "example.ts",
         contents: Array.from(
-          { length: 31 },
+          { length: 51 },
           (_, index) => `new line ${index + 1}`,
         ).join("\n"),
       },

@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { skipToken, useQuery } from "@tanstack/react-query";
 import { WorkerPoolContextProvider } from "@pierre/diffs/react";
 import {
   CirclePlus,
@@ -11,7 +11,7 @@ import {
   Minus,
   RefreshCw,
 } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 import {
   getFileDiff,
@@ -41,7 +41,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useDiffUrlState } from "@/components/use-diff-url-state";
+import { useViewerUrlState } from "@/components/use-viewer-url-state";
 import {
   EmptyState,
   ErrorState,
@@ -49,7 +49,10 @@ import {
   NoRepositoriesState,
 } from "@/components/viewer-states";
 import { getComparisonLabel, getSemCommand } from "@/lib/comparison";
-import { resolveDiffSelection } from "@/lib/diff-selection";
+import {
+  resolveDiffSelection,
+  type DiffSelection,
+} from "@/lib/diff-selection";
 import { groupByFile, hasFileInDiff } from "@/lib/group-changes";
 import { mergeModuleLevelChanges } from "@/lib/merge-module-changes";
 import type { FileOnlyChange } from "@/lib/sem-types";
@@ -95,6 +98,7 @@ function SummaryStat({
 
 export function SemanticDiffViewer() {
   const theme = useTheme();
+  const [selection, setSelection] = useState<DiffSelection | null>(null);
   const repositoriesQuery = useQuery({
     queryKey: ["workspace-repositories"],
     queryFn: getWorkspaceRepositories,
@@ -108,19 +112,14 @@ export function SemanticDiffViewer() {
   );
   const {
     comparison,
-    selectedEntityId: selectedEntityIdFromUrl,
-    selectedFilePath,
     mergeModuleChanges,
     showRepositoryRail,
     selectedRepoId,
-    selectEntity,
-    selectRepository,
-    selectFile,
+    selectRepository: setRepositoryInUrl,
     selectComparisonMode,
     compareCommits,
-    toggleModuleMerge,
-    clearSelectedFile,
-  } = useDiffUrlState(repositories);
+    toggleModuleMerge: toggleModuleMergeInUrl,
+  } = useViewerUrlState(repositories);
   const activeRepository =
     repositories.find((repo) => repo.id === selectedRepoId);
   const activeRepoId = activeRepository?.id;
@@ -159,22 +158,19 @@ export function SemanticDiffViewer() {
     effectiveSelectedFilePath,
     selectedFileGroup,
     fileDiffPath,
+    fileTarget,
   } = useMemo(
-    () =>
-      resolveDiffSelection(
-        fileGroups,
-        selectedEntityIdFromUrl,
-        selectedFilePath,
-      ),
-    [fileGroups, selectedEntityIdFromUrl, selectedFilePath],
+    () => resolveDiffSelection(fileGroups, selection),
+    [fileGroups, selection],
   );
   const fileQuery = useQuery({
     queryKey: ["file-diff", activeRepoId, comparison, fileDiffPath],
-    queryFn: () => getFileDiff(fileDiffPath!, comparison, activeRepoId),
-    enabled:
+    queryFn:
       activeRepoId !== undefined &&
       fileDiffPath !== undefined &&
-      diff !== undefined,
+      diff !== undefined
+        ? () => getFileDiff(fileDiffPath, comparison, activeRepoId)
+        : skipToken,
   });
   const isRefreshing =
     repositoriesQuery.isFetching || query.isFetching || fileQuery.isFetching;
@@ -185,7 +181,7 @@ export function SemanticDiffViewer() {
 
     if (filePathToRefresh) {
       if (
-        selectedFilePath &&
+        selection?.type === "file" &&
         refreshed.data?.ok &&
         !hasFileInDiff(
           filePathToRefresh,
@@ -193,7 +189,7 @@ export function SemanticDiffViewer() {
           refreshed.data.data.fileChanges,
         )
       ) {
-        clearSelectedFile();
+        setSelection(null);
         return;
       }
 
@@ -205,6 +201,36 @@ export function SemanticDiffViewer() {
   async function refreshAll() {
     await repositoriesQuery.refetch();
     await refreshDiff();
+  }
+
+  function selectEntity(entityId: string) {
+    setSelection({ type: "entity", entityId });
+  }
+
+  function selectFile(filePath: string) {
+    setSelection({ type: "file", filePath });
+  }
+
+  function selectRepository(repoId: string) {
+    setSelection(null);
+    setRepositoryInUrl(repoId);
+  }
+
+  function changeComparisonMode(
+    mode: Parameters<typeof selectComparisonMode>[0],
+  ) {
+    setSelection(null);
+    selectComparisonMode(mode);
+  }
+
+  function changeComparedCommits(from: string, to: string) {
+    setSelection(null);
+    compareCommits(from, to);
+  }
+
+  function toggleModuleMerge() {
+    setSelection(null);
+    toggleModuleMergeInUrl();
   }
 
   return (
@@ -248,8 +274,8 @@ export function SemanticDiffViewer() {
               key={getComparisonLabel(comparison)}
               comparison={comparison}
               commits={commitsQuery.data?.ok ? commitsQuery.data.data : []}
-              onModeChange={selectComparisonMode}
-              onCompare={compareCommits}
+              onModeChange={changeComparisonMode}
+              onCompare={changeComparedCommits}
             />
           </div>
 
@@ -402,6 +428,7 @@ export function SemanticDiffViewer() {
                           cacheKey={fileQuery.data.data.cacheKey}
                           theme={theme}
                           comparison={comparison}
+                          target={fileTarget}
                         />
                       ) : null}
                       {fileDiffPath &&
@@ -420,6 +447,13 @@ export function SemanticDiffViewer() {
                           change={selectedChange}
                           theme={theme}
                           renderVersion={diff.refreshedAt}
+                          onViewInContext={(target) =>
+                            setSelection({
+                              type: "file",
+                              filePath: selectedChange.filePath,
+                              target,
+                            })
+                          }
                           onPreviousEntity={
                             selectedEntityIndex > 0
                               ? () =>

@@ -24,16 +24,22 @@ const fileGroups = groupByFile([
 
 describe("three-pane diff selection", () => {
   it("defaults to the first semantic entity", () => {
-    expect(resolveDiffSelection(fileGroups)).toMatchObject({
+    expect(resolveDiffSelection(fileGroups, null)).toMatchObject({
       effectiveSelectedFilePath: "src/a.ts",
       fileDiffPath: undefined,
+      selection: { type: "entity", entityId: "first" },
       selectedEntityId: "first",
       selectedEntityIndex: 0,
     });
   });
 
   it("derives the selected file from an entity selection", () => {
-    expect(resolveDiffSelection(fileGroups, "second")).toMatchObject({
+    expect(
+      resolveDiffSelection(fileGroups, {
+        type: "entity",
+        entityId: "second",
+      }),
+    ).toMatchObject({
       effectiveSelectedFilePath: "src/b.ts",
       fileDiffPath: undefined,
       selectedEntityId: "second",
@@ -41,9 +47,12 @@ describe("three-pane diff selection", () => {
     });
   });
 
-  it("gives explicit file selection precedence", () => {
+  it("represents a full-file selection as one explicit mode", () => {
     expect(
-      resolveDiffSelection(fileGroups, "second", "src/a.ts"),
+      resolveDiffSelection(fileGroups, {
+        type: "file",
+        filePath: "src/a.ts",
+      }),
     ).toMatchObject({
       effectiveSelectedFilePath: "src/a.ts",
       fileDiffPath: "src/a.ts",
@@ -53,7 +62,10 @@ describe("three-pane diff selection", () => {
 
   it("falls back from a stale file path to the first semantic entity", () => {
     expect(
-      resolveDiffSelection(fileGroups, undefined, "src/missing.ts"),
+      resolveDiffSelection(fileGroups, {
+        type: "file",
+        filePath: "src/missing.ts",
+      }),
     ).toMatchObject({
       effectiveSelectedFilePath: "src/a.ts",
       fileDiffPath: undefined,
@@ -66,7 +78,12 @@ describe("three-pane diff selection", () => {
   });
 
   it("falls back from an unknown entity to the first semantic entity", () => {
-    expect(resolveDiffSelection(fileGroups, "unknown")).toMatchObject({
+    expect(
+      resolveDiffSelection(fileGroups, {
+        type: "entity",
+        entityId: "unknown",
+      }),
+    ).toMatchObject({
       effectiveSelectedFilePath: "src/a.ts",
       fileDiffPath: undefined,
       selectedEntityId: "first",
@@ -83,11 +100,25 @@ describe("three-pane diff selection", () => {
       },
     ]);
 
-    expect(resolveDiffSelection(groupsWithoutEntities)).toMatchObject({
+    expect(resolveDiffSelection(groupsWithoutEntities, null)).toMatchObject({
       effectiveSelectedFilePath: "README.md",
       fileDiffPath: "README.md",
+      selection: { type: "file", filePath: "README.md" },
       selectedChange: undefined,
       selectedEntityIndex: -1,
+    });
+  });
+
+  it("preserves a side-aware full-file line target", () => {
+    expect(
+      resolveDiffSelection(fileGroups, {
+        type: "file",
+        filePath: "src/b.ts",
+        target: { lineNumber: 42, side: "deletions" },
+      }),
+    ).toMatchObject({
+      fileDiffPath: "src/b.ts",
+      fileTarget: { lineNumber: 42, side: "deletions" },
     });
   });
 });

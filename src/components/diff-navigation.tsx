@@ -1,6 +1,7 @@
 "use client";
 
 import type { FileDiffMetadata } from "@pierre/diffs";
+import type { CodeViewHandle } from "@pierre/diffs/react";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -28,35 +29,28 @@ export function shouldIgnoreNavigationKey(event: KeyboardEvent) {
 
 export function useHunkNavigation(
   hunks: FileDiffMetadata["hunks"],
-  diffRootRef: React.RefObject<HTMLDivElement | null>,
+  codeViewRef: React.RefObject<CodeViewHandle<undefined> | null>,
+  itemId: string,
 ) {
   const [currentHunk, setCurrentHunk] = useState(0);
 
   const jumpToHunk = useCallback(
     (index: number) => {
       const hunk = hunks[index];
-      const diffContainer =
-        diffRootRef.current?.querySelector<HTMLElement>("diffs-container");
-      const shadowRoot = diffContainer?.shadowRoot;
+      if (!hunk) return;
 
-      if (!hunk || !shadowRoot) return;
-
-      const lineNumber =
-        hunk.additionStart > 0 ? hunk.additionStart : hunk.deletionStart;
-      const line =
-        shadowRoot.querySelector<HTMLElement>(
-          `[data-line="${lineNumber}"]`,
-        ) ??
-        shadowRoot.querySelector<HTMLElement>(
-          `[data-column-number="${lineNumber}"]`,
-        );
-
-      if (!line) return;
-
-      line.scrollIntoView({ behavior: "smooth", block: "start" });
+      const hasAdditions = hunk.additionCount > 0;
+      codeViewRef.current?.scrollTo({
+        type: "line",
+        id: itemId,
+        lineNumber: hasAdditions ? hunk.additionStart : hunk.deletionStart,
+        side: hasAdditions ? "additions" : "deletions",
+        align: "start",
+        behavior: "smooth",
+      });
       setCurrentHunk(index);
     },
-    [diffRootRef, hunks],
+    [codeViewRef, hunks, itemId],
   );
 
   return {
