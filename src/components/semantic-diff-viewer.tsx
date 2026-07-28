@@ -48,7 +48,11 @@ import {
   LoadingState,
   NoRepositoriesState,
 } from "@/components/viewer-states";
-import { getComparisonLabel, getSemCommand } from "@/lib/comparison";
+import {
+  getComparisonLabel,
+  getGitFileDiffCommand,
+  getSemCommand,
+} from "@/lib/comparison";
 import {
   resolveDiffSelection,
   type DiffSelection,
@@ -174,6 +178,13 @@ export function SemanticDiffViewer() {
   });
   const isRefreshing =
     repositoriesQuery.isFetching || query.isFetching || fileQuery.isFetching;
+  const statusCommand = fileDiffPath
+    ? getGitFileDiffCommand(
+        comparison,
+        fileDiffPath,
+        selectedFileGroup?.fileChange?.changeType === "untracked",
+      )
+    : getSemCommand(comparison);
 
   async function refreshDiff() {
     const refreshed = await query.refetch();
@@ -501,12 +512,14 @@ export function SemanticDiffViewer() {
         </div>
 
         <footer className="flex h-7 shrink-0 items-center justify-between border-t bg-card px-3 font-mono text-[10px] text-muted-foreground">
-          <span className="flex items-center gap-1.5">
-            <CirclePlus className="size-3" />
-            {getSemCommand(comparison)}
+          <span className="flex min-w-0 flex-1 items-center gap-1.5">
+            <CirclePlus className="size-3 shrink-0" />
+            <span className="truncate" title={statusCommand}>
+              {statusCommand}
+            </span>
           </span>
           {diff ? (
-            <span className="flex items-center gap-1.5">
+            <span className="flex shrink-0 items-center gap-1.5 pl-3">
               <Minus className="size-3" />
               refreshed {new Date(diff.refreshedAt).toLocaleTimeString()}
             </span>

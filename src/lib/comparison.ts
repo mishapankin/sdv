@@ -1,5 +1,17 @@
 import type { Comparison } from "@/lib/sem-types";
 
+function quoteShellArgument(argument: string) {
+  if (/^[A-Za-z0-9_./:@%+=,-]+$/.test(argument)) {
+    return argument;
+  }
+
+  return `'${argument.replaceAll("'", "'\\''")}'`;
+}
+
+function formatShellCommand(command: string, args: string[]) {
+  return [command, ...args].map(quoteShellArgument).join(" ");
+}
+
 export function getComparisonFromSearchParams(
   searchParams: Pick<URLSearchParams, "get">,
 ): Comparison {
@@ -34,8 +46,55 @@ export function getSemCommand(comparison: Comparison) {
   }
 
   if (comparison.mode === "commits") {
-    return `sem diff --from ${comparison.from} --to ${comparison.to} --verbose --format json`;
+    return formatShellCommand("sem", [
+      "diff",
+      "--from",
+      comparison.from,
+      "--to",
+      comparison.to,
+      "--verbose",
+      "--format",
+      "json",
+    ]);
   }
 
   return "sem diff HEAD --verbose --format json";
+}
+
+export function getGitFileDiffCommand(
+  comparison: Comparison,
+  filePath: string,
+  isUntracked = false,
+) {
+  if (isUntracked) {
+    return formatShellCommand("git", [
+      "diff",
+      "--no-index",
+      "--",
+      "/dev/null",
+      filePath,
+    ]);
+  }
+
+  if (comparison.mode === "staged") {
+    return formatShellCommand("git", [
+      "diff",
+      "--cached",
+      "--",
+      filePath,
+    ]);
+  }
+
+  if (comparison.mode === "commits") {
+    return formatShellCommand("git", [
+      "diff",
+      "--end-of-options",
+      comparison.from,
+      comparison.to,
+      "--",
+      filePath,
+    ]);
+  }
+
+  return formatShellCommand("git", ["diff", "HEAD", "--", filePath]);
 }
