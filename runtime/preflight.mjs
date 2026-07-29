@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { statSync } from "node:fs";
 import path from "node:path";
 
 const DESKTOP_PATHS = {
@@ -42,6 +43,19 @@ export function preflightWorkspace(
   } = {},
 ) {
   const workspaceDirectory = path.resolve(directory);
+
+  try {
+    if (!statSync(workspaceDirectory).isDirectory()) {
+      throw new Error("not a directory");
+    }
+  } catch {
+    return {
+      ok: false,
+      code: "invalid-directory",
+      error: "sdv: selected directory does not exist or is not a directory",
+    };
+  }
+
   const executableEnvironment = createExecutableEnvironment(
     environment,
     platform,

@@ -63,10 +63,11 @@ is used for repository dirty state, untracked files, and full-file diffs.
 
 ## Electron desktop application
 
-The desktop application opens the most recently used repository. On first
-launch, or when File → Open Repository is selected, it uses the native
-directory picker. Each repository is validated before SDV starts its private
-loopback server.
+The desktop application opens to a workspace launcher with recently used
+repositories and a native directory picker. Recent repositories are stored as
+versioned JSON in Electron's per-user application data directory (including
+the XDG configuration location on Linux). Each repository is validated before
+SDV starts its private loopback server.
 
 Build and launch the Electron application in development:
 

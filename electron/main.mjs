@@ -1,7 +1,14 @@
 import { randomBytes } from "node:crypto";
-import { readFile, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  readFile,
+  rename,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
   app,
@@ -14,6 +21,13 @@ import {
 } from "electron";
 
 import { getRequestedWorkspace } from "./arguments.mjs";
+import { createOperationQueue } from "./operation-queue.mjs";
+import {
+  forgetRecentRepository,
+  parseRecentRepositories,
+  rememberRecentRepository,
+  serializeRecentRepositories,
+} from "./recent-repositories.mjs";
 import { DESKTOP_TOKEN_HEADER } from "../runtime/constants.mjs";
 import { preflightWorkspace } from "../runtime/preflight.mjs";
 import {
@@ -29,14 +43,18 @@ const packageRoot = path.resolve(
   "..",
 );
 const preloadPath = path.join(packageRoot, "electron", "preload.cjs");
+const launcherPath = path.join(packageRoot, "electron", "launcher.html");
+const launcherUrl = pathToFileURL(launcherPath).href;
 const LOOPBACK_HOST = "127.0.0.1";
-const RECENT_REPOSITORIES_LIMIT = 10;
 
 let mainWindow;
 let activeServer;
 let activeOrigin;
 let activeRepository;
+let initializing = true;
+let pendingWorkspace;
 let quitting = false;
+const enqueueWorkspaceOperation = createOperationQueue();
 
 const requestedWorkspace = getRequestedWorkspace(process.argv);
 const hasSingleInstanceLock = app.requestSingleInstanceLock(
@@ -54,27 +72,63 @@ function getRecentRepositoriesPath() {
 async function readRecentRepositories() {
   try {
     const contents = await readFile(getRecentRepositoriesPath(), "utf8");
-    const parsed = JSON.parse(contents);
-
-    return Array.isArray(parsed)
-      ? parsed.filter((entry) => typeof entry === "string")
-      : [];
+    return parseRecentRepositories(JSON.parse(contents));
   } catch {
     return [];
   }
 }
 
+async function writeRecentRepositories(repositories) {
+  const destination = getRecentRepositoriesPath();
+  const temporaryPath = `${destination}.${process.pid}-${randomBytes(6).toString("hex")}.tmp`;
+
+  await mkdir(path.dirname(destination), { recursive: true });
+
+  try {
+    await writeFile(
+      temporaryPath,
+      serializeRecentRepositories(repositories),
+      "utf8",
+    );
+    await rename(temporaryPath, destination);
+  } catch (error) {
+    await rm(temporaryPath, { force: true });
+    throw error;
+  }
+}
+
 async function rememberRepository(directory) {
   const recent = await readRecentRepositories();
-  const repositories = [
-    directory,
-    ...recent.filter((entry) => entry !== directory),
-  ].slice(0, RECENT_REPOSITORIES_LIMIT);
+  await writeRecentRepositories(rememberRecentRepository(recent, directory));
+}
 
-  await writeFile(
-    getRecentRepositoriesPath(),
-    `${JSON.stringify(repositories, null, 2)}\n`,
-    "utf8",
+async function forgetRepository(directory) {
+  const recent = await readRecentRepositories();
+  await writeRecentRepositories(
+    forgetRecentRepository(recent, directory),
+  );
+}
+
+async function getRecentRepositoryViewModels() {
+  const recent = await readRecentRepositories();
+
+  return Promise.all(
+    recent.map(async (entry) => {
+      let available = false;
+
+      try {
+        available = (await stat(entry.path)).isDirectory();
+      } catch {
+        // Keep unavailable entries visible so the user can remove them.
+      }
+
+      return {
+        available,
+        lastOpenedAt: entry.lastOpenedAt,
+        name: path.basename(entry.path),
+        path: entry.path,
+      };
+    }),
   );
 }
 
@@ -185,6 +239,14 @@ function installSessionGuards() {
 
 function isTrustedSender(event) {
   try {
+    if (!mainWindow || event.sender !== mainWindow.webContents) {
+      return false;
+    }
+
+    if (event.senderFrame.url === launcherUrl) {
+      return true;
+    }
+
     return (
       activeOrigin !== undefined &&
       new URL(event.senderFrame.url).origin === activeOrigin
@@ -214,7 +276,10 @@ function createWindow() {
   window.once("ready-to-show", () => window.show());
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   window.webContents.on("will-navigate", (event, url) => {
-    if (!activeOrigin || new URL(url).origin !== activeOrigin) {
+    if (
+      url !== launcherUrl &&
+      (!activeOrigin || new URL(url).origin !== activeOrigin)
+    ) {
       event.preventDefault();
     }
   });
@@ -258,12 +323,42 @@ async function openWorkspace(directory) {
     return { ok: false, error: message };
   }
 
-  await Promise.all([
-    stopServer(previousServer),
-    rememberRepository(nextServer.directory),
-  ]);
+  await stopServer(previousServer);
+
+  try {
+    await rememberRepository(nextServer.directory);
+  } catch (error) {
+    console.error(`sdv: unable to remember repository: ${error.message}`);
+  }
 
   return { ok: true };
+}
+
+async function showLauncher() {
+  const previousServer = activeServer;
+
+  activeServer = undefined;
+  activeOrigin = undefined;
+  activeRepository = undefined;
+
+  try {
+    await mainWindow.loadFile(launcherPath);
+  } catch (error) {
+    activeServer = previousServer;
+    activeOrigin = previousServer?.origin;
+    activeRepository = previousServer?.directory;
+    throw error;
+  }
+
+  await stopServer(previousServer);
+}
+
+function enqueueOpenWorkspace(directory) {
+  return enqueueWorkspaceOperation(() => openWorkspace(directory));
+}
+
+function enqueueShowLauncher() {
+  return enqueueWorkspaceOperation(showLauncher);
 }
 
 async function selectRepository() {
@@ -277,7 +372,7 @@ async function selectRepository() {
     return { ok: false, canceled: true };
   }
 
-  return openWorkspace(selection.filePaths[0]);
+  return enqueueOpenWorkspace(selection.filePaths[0]);
 }
 
 function installIpcHandlers() {
@@ -299,6 +394,37 @@ function installIpcHandlers() {
     }
 
     return selectRepository();
+  });
+
+  ipcMain.handle("sdv:get-recent-repositories", async (event) => {
+    if (!isTrustedSender(event)) {
+      throw new Error("untrusted IPC sender");
+    }
+
+    return getRecentRepositoryViewModels();
+  });
+
+  ipcMain.handle("sdv:open-recent-repository", async (event, directory) => {
+    if (!isTrustedSender(event)) {
+      throw new Error("untrusted IPC sender");
+    }
+    if (typeof directory !== "string" || directory.length > 4096) {
+      throw new Error("invalid repository path");
+    }
+
+    return enqueueOpenWorkspace(directory);
+  });
+
+  ipcMain.handle("sdv:forget-repository", async (event, directory) => {
+    if (!isTrustedSender(event)) {
+      throw new Error("untrusted IPC sender");
+    }
+    if (typeof directory !== "string" || directory.length > 4096) {
+      throw new Error("invalid repository path");
+    }
+
+    await forgetRepository(directory);
+    return { ok: true };
   });
 }
 
@@ -325,6 +451,11 @@ function installApplicationMenu() {
     {
       label: "File",
       submenu: [
+        {
+          label: "Welcome",
+          accelerator: "CmdOrCtrl+Shift+O",
+          click: () => void enqueueShowLauncher(),
+        },
         {
           label: "Open Repository…",
           accelerator: "CmdOrCtrl+O",
@@ -359,19 +490,6 @@ function installApplicationMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
-async function openInitialWorkspace() {
-  const recentRepositories = await readRecentRepositories();
-  const initialWorkspace = requestedWorkspace || recentRepositories[0];
-
-  if (initialWorkspace) {
-    const result = await openWorkspace(initialWorkspace);
-    if (result.ok) return true;
-  }
-
-  const selection = await selectRepository();
-  return selection.ok;
-}
-
 if (hasSingleInstanceLock) {
   app.on("second-instance", (_event, _argv, _cwd, additionalData) => {
     const workspace =
@@ -383,7 +501,11 @@ if (hasSingleInstanceLock) {
         : undefined;
 
     if (workspace) {
-      void openWorkspace(workspace);
+      if (initializing || !mainWindow) {
+        pendingWorkspace = workspace;
+      } else {
+        void enqueueOpenWorkspace(workspace);
+      }
     }
 
     if (mainWindow) {
@@ -398,8 +520,24 @@ if (hasSingleInstanceLock) {
     installApplicationMenu();
     mainWindow = createWindow();
 
-    if (!(await openInitialWorkspace())) {
-      app.quit();
+    const initialWorkspace = pendingWorkspace || requestedWorkspace;
+    pendingWorkspace = undefined;
+
+    if (initialWorkspace) {
+      const result = await enqueueOpenWorkspace(initialWorkspace);
+      if (!result.ok) {
+        await enqueueShowLauncher();
+      }
+    } else {
+      await enqueueShowLauncher();
+    }
+
+    initializing = false;
+
+    if (pendingWorkspace) {
+      const workspace = pendingWorkspace;
+      pendingWorkspace = undefined;
+      void enqueueOpenWorkspace(workspace);
     }
   });
 

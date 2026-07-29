@@ -29,13 +29,29 @@ describe("createExecutableEnvironment", () => {
 });
 
 describe("preflightWorkspace", () => {
+  it("rejects a missing directory before checking sem", () => {
+    const { calls, execute } = createExecutor([]);
+
+    expect(
+      preflightWorkspace("/tmp/sdv-directory-that-does-not-exist", {
+        execute,
+        platform: "linux",
+      }),
+    ).toEqual({
+      ok: false,
+      code: "invalid-directory",
+      error: "sdv: selected directory does not exist or is not a directory",
+    });
+    expect(calls).toHaveLength(0);
+  });
+
   it("reports a missing sem executable before checking Git", () => {
     const { calls, execute } = createExecutor([
       { error: { code: "ENOENT" }, status: null, stderr: "" },
     ]);
 
     expect(
-      preflightWorkspace("/tmp/example", { execute, platform: "linux" }),
+      preflightWorkspace("/tmp", { execute, platform: "linux" }),
     ).toEqual({
       ok: false,
       code: "missing-sem",
@@ -80,7 +96,7 @@ describe("preflightWorkspace", () => {
     ]);
 
     expect(
-      preflightWorkspace("/tmp/example", { execute, platform: "linux" }),
+      preflightWorkspace("/tmp", { execute, platform: "linux" }),
     ).toMatchObject({
       ok: false,
       code: "invalid-repository",
