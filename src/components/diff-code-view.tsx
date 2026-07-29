@@ -55,7 +55,11 @@ export function DiffCodeView({
           diffStyle: "split",
           diffIndicators: "bars",
           lineDiffType: "word-alt",
-          theme: theme === "dark" ? "pierre-dark" : "pierre-light",
+          theme: {
+            dark: "pierre-dark",
+            light: "pierre-light",
+          },
+          themeType: theme,
           overflow: "scroll",
           disableFileHeader: true,
           expandUnchanged: shouldExpandUnchanged(fileDiff),

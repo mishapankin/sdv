@@ -56,3 +56,18 @@ is used for repository dirty state, untracked files, and full-file diffs.
 -V, --version        Print the SDV version
 -h, --help           Show help
 ```
+
+## Tauri development host
+
+The `tauri` branch includes a development-only Tauri host for testing SDV in
+the system WebView. It starts Next.js on `127.0.0.1:3001` and loads that server
+in a native window:
+
+```bash
+pnpm tauri dev
+```
+
+This host is currently a compatibility spike, not a production desktop bundle.
+The application still requires the server-based Next.js runtime; repository
+selection and production sidecar packaging are intentionally left for the next
+migration stage.

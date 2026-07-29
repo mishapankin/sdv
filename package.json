@@ -10,12 +10,14 @@
   },
   "scripts": {
     "dev": "next dev",
+    "dev:tauri": "next dev --hostname 127.0.0.1 --port 3001",
     "build": "next build",
     "start": "next start",
     "generate:file-icons": "node scripts/generate-file-icons.mjs",
     "lint": "eslint",
     "test": "vitest run",
-    "sdv": "node ./bin/sdv.mjs"
+    "sdv": "node ./bin/sdv.mjs",
+    "tauri": "tauri"
   },
   "dependencies": {
     "@pierre/diffs": "^1.2.12",
@@ -37,6 +39,7 @@
   "devDependencies": {
     "@iconify-json/vscode-icons": "^1.2.67",
     "@tailwindcss/postcss": "^4.3.3",
+    "@tauri-apps/cli": "^2.11.4",
     "@types/node": "^26.1.1",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
