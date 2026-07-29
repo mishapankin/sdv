@@ -1,7 +1,10 @@
 {
   "name": "sdv",
   "version": "0.1.0",
+  "description": "A local semantic Git diff viewer",
+  "author": "SDV contributors",
   "private": true,
+  "main": "./electron/main.mjs",
   "engines": {
     "node": ">=22.12.0"
   },
@@ -10,8 +13,11 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build && node scripts/stage-standalone.mjs",
     "start": "next start",
+    "electron:dev": "pnpm build && electron .",
+    "electron:package": "pnpm build && node scripts/package-electron.mjs",
+    "electron:make": "pnpm build && node scripts/make-electron.mjs",
     "generate:file-icons": "node scripts/generate-file-icons.mjs",
     "lint": "eslint",
     "test": "vitest run",
@@ -35,11 +41,16 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@electron-forge/maker-deb": "^7.11.2",
+    "@electron-forge/maker-zip": "^7.11.2",
+    "@electron/fuses": "^2.1.3",
+    "@electron/packager": "20.0.4",
     "@iconify-json/vscode-icons": "^1.2.67",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^26.1.1",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
+    "electron": "^43.2.0",
     "eslint": "^9.39.5",
     "eslint-config-next": "16.2.12",
     "tailwindcss": "^4.3.3",
