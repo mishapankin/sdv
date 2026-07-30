@@ -1,13 +1,22 @@
 #!/usr/bin/env node
 
-import { spawn, spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
-import http from "node:http";
-import net from "node:net";
 import { constants as osConstants } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Command, InvalidArgumentError } from "commander";
+
+import { preflightWorkspace } from "../runtime/preflight.mjs";
+import {
+  checkPortAvailable,
+  createServerEnvironment,
+  formatListenAddress,
+  formatServerUrl,
+  resolveStandaloneServerPath,
+  spawnNodeServer,
+  waitForServer,
+} from "../runtime/server-runtime.mjs";
 
 const packageRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -20,7 +29,12 @@ const packageJson = JSON.parse(
 function parsePort(value) {
   const port = Number.parseInt(value, 10);
 
-  if (!Number.isInteger(port) || String(port) !== value || port < 1 || port > 65535) {
+  if (
+    !Number.isInteger(port) ||
+    String(port) !== value ||
+    port < 1 ||
+    port > 65535
+  ) {
     throw new InvalidArgumentError("must be an integer between 1 and 65535");
   }
 
@@ -39,95 +53,17 @@ const program = new Command()
 
 const options = program.opts();
 const repositoryDirectory = process.cwd();
-const browserHost =
-  options.host === "0.0.0.0"
-    ? "127.0.0.1"
-    : options.host === "::"
-      ? "::1"
-      : options.host;
-const formattedBrowserHost = browserHost.includes(":")
-  ? `[${browserHost}]`
-  : browserHost;
-const serverUrl = `http://${formattedBrowserHost}:${options.port}`;
-const displayHost = options.host === "127.0.0.1" ? "localhost" : options.host;
-const nextBinary = path.join(
-  packageRoot,
-  "node_modules",
-  "next",
-  "dist",
-  "bin",
-  "next",
-);
+const preflight = preflightWorkspace(repositoryDirectory);
 
-const semCheck = spawnSync("sem", ["--version"], {
-  cwd: repositoryDirectory,
-  encoding: "utf8",
-});
+if (!preflight.ok) {
+  const message =
+    preflight.code === "invalid-repository"
+      ? "sdv: current directory is not a Git worktree"
+      : preflight.error;
+  const log = preflight.code === "missing-sem" ? console.log : console.error;
 
-if (semCheck.error?.code === "ENOENT") {
-  console.log("sdv: sem is missing from PATH");
+  log(message);
   process.exit(1);
-}
-
-if (semCheck.status !== 0) {
-  console.error((semCheck.stderr || "sdv: unable to run sem").trim());
-  process.exit(1);
-}
-
-const gitVersionCheck = spawnSync("git", ["--version"], {
-  cwd: repositoryDirectory,
-  encoding: "utf8",
-});
-
-if (gitVersionCheck.status !== 0) {
-  console.error((gitVersionCheck.stderr || "sdv: unable to run git").trim());
-  process.exit(1);
-}
-
-function isGitRepository(directory) {
-  const gitCheck = spawnSync("git", ["rev-parse", "--is-inside-work-tree"], {
-    cwd: directory,
-    encoding: "utf8",
-  });
-
-  return gitCheck.status === 0 && gitCheck.stdout.trim() === "true";
-}
-
-if (!isGitRepository(repositoryDirectory)) {
-  console.error("sdv: current directory is not a Git worktree");
-  process.exit(1);
-}
-
-const serverEnvironment = {
-  ...process.env,
-  SDV_WORKSPACE_CWD: repositoryDirectory,
-  SDV_SEARCH_DEPTH: "0",
-};
-
-function formatListenAddress(host, port) {
-  if (host === "127.0.0.1") {
-    return `localhost:${port}`;
-  }
-
-  return host.includes(":") ? `[${host}]:${port}` : `${host}:${port}`;
-}
-
-function checkPortAvailable(host, port) {
-  return new Promise((resolve, reject) => {
-    const probe = net.createServer();
-
-    probe.once("error", reject);
-    probe.listen({ host, port }, () => {
-      probe.close((error) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-
-        resolve();
-      });
-    });
-  });
 }
 
 try {
@@ -148,49 +84,30 @@ try {
   process.exit(1);
 }
 
+let serverPath;
+
+try {
+  serverPath = await resolveStandaloneServerPath(packageRoot);
+} catch (error) {
+  console.error(`sdv: ${error.message}`);
+  process.exit(1);
+}
+
+const displayHost = options.host === "127.0.0.1" ? "localhost" : options.host;
+const serverUrl = formatServerUrl(options.host, options.port);
+const serverEnvironment = createServerEnvironment({
+  environment: preflight.environment,
+  host: options.host,
+  port: options.port,
+  workspaceDirectory: preflight.directory,
+});
+
 console.log(`Running on ${displayHost}:${options.port}`);
 
-const server = spawn(
-  process.execPath,
-  [
-    nextBinary,
-    "start",
-    packageRoot,
-    "--hostname",
-    options.host,
-    "--port",
-    String(options.port),
-  ],
-  {
-    cwd: repositoryDirectory,
-    detached: true,
-    env: serverEnvironment,
-    stdio: "inherit",
-  },
-);
-
-function waitForServer(url, attempts = 100) {
-  return new Promise((resolve, reject) => {
-    function check(remainingAttempts) {
-      const request = http.get(url, (response) => {
-        response.resume();
-        resolve();
-      });
-
-      request.setTimeout(500, () => request.destroy());
-      request.on("error", () => {
-        if (remainingAttempts <= 1) {
-          reject(new Error("server did not become ready in time"));
-          return;
-        }
-
-        setTimeout(() => check(remainingAttempts - 1), 100);
-      });
-    }
-
-    check(attempts);
-  });
-}
+const server = spawnNodeServer({
+  serverPath,
+  environment: serverEnvironment,
+});
 
 function openBrowser(url) {
   const command =
@@ -216,6 +133,9 @@ function openBrowser(url) {
   opener.unref();
 }
 
+let shutdownSignal;
+let shutdownTimer;
+
 if (options.open) {
   waitForServer(serverUrl)
     .then(() => openBrowser(serverUrl))
@@ -225,9 +145,6 @@ if (options.open) {
       }
     });
 }
-
-let shutdownSignal;
-let shutdownTimer;
 
 function getSignalExitCode(signal) {
   return 128 + (osConstants.signals[signal] ?? 0);
@@ -239,7 +156,11 @@ function killServer(signal) {
   }
 
   try {
-    process.kill(-server.pid, signal);
+    if (process.platform === "win32") {
+      server.kill(signal);
+    } else {
+      process.kill(-server.pid, signal);
+    }
   } catch (error) {
     if (error?.code !== "ESRCH") {
       console.error(`sdv: failed to stop server: ${error.message}`);

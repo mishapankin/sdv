@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SDV — Workspaces</title>
+    <link rel="stylesheet" href="./launcher.css" />
+    <script src="./launcher.js" defer></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <main class="launcher-main">
+        <section class="workspace-section" aria-labelledby="recent-heading">
+          <div class="workspace-section__heading">
+            <div>
+              <h1>Workspaces</h1>
+              <p>Open a Git repository to inspect its current changes.</p>
+            </div>
+            <button class="open-button" id="open-workspace" type="button">
+              Open Workspace
+            </button>
+          </div>
+
+          <div class="workspace-panel">
+            <div class="workspace-panel__header">
+              <h2 id="recent-heading">Recent</h2>
+            </div>
+            <div
+              class="workspace-list"
+              id="workspace-list"
+              aria-live="polite"
+              aria-busy="true"
+            >
+              <div class="loading-row">
+                <span class="loading-row__spinner" aria-hidden="true"></span>
+                Loading workspaces
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer class="app-status">
+        <div class="app-status__item">
+          <span class="status-indicator" aria-hidden="true"></span>
+          Local only
+        </div>
+        <span>Recent workspaces are stored on this device</span>
+      </footer>
+    </div>
+  </body>
+</html>
