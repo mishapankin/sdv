@@ -15,6 +15,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { usePanelRef } from "react-resizable-panels";
 
 import {
   getFileDiff,
@@ -86,6 +87,8 @@ const DIFF_HIGHLIGHTER_OPTIONS = {
 export function SemanticDiffViewer() {
   const theme = useTheme();
   const queryClient = useQueryClient();
+  const leftSidebarRef = usePanelRef();
+  const rightSidebarRef = usePanelRef();
   const [selection, setSelection] = useState<DiffSelection | null>(null);
   const repositoriesQuery = useQuery({
     queryKey: ["workspace-repositories"],
@@ -130,6 +133,39 @@ export function SemanticDiffViewer() {
       document.title = `SDV: ${diff.repositoryName}`;
     }
   }, [diff]);
+
+  useEffect(() => {
+    function handleSidebarShortcut(event: KeyboardEvent) {
+      if (
+        event.defaultPrevented ||
+        event.repeat ||
+        event.shiftKey ||
+        event.code !== "KeyB" ||
+        (!event.metaKey && !event.ctrlKey)
+      ) {
+        return;
+      }
+
+      const panel = event.altKey
+        ? rightSidebarRef.current
+        : leftSidebarRef.current;
+
+      if (!panel) {
+        return;
+      }
+
+      event.preventDefault();
+
+      if (panel.isCollapsed()) {
+        panel.expand();
+      } else {
+        panel.collapse();
+      }
+    }
+
+    window.addEventListener("keydown", handleSidebarShortcut);
+    return () => window.removeEventListener("keydown", handleSidebarShortcut);
+  }, [leftSidebarRef, rightSidebarRef]);
 
   const visibleChanges = useMemo(
     () =>
@@ -382,9 +418,12 @@ export function SemanticDiffViewer() {
                 selectedFileGroup ? (
                   <ResizablePanelGroup orientation="horizontal">
                     <ResizablePanel
+                      panelRef={leftSidebarRef}
                       defaultSize="24%"
                       minSize="220px"
                       maxSize="34%"
+                      collapsible
+                      collapsedSize="0px"
                     >
                       <DiffSidebar
                         changes={visibleChanges}
@@ -469,6 +508,7 @@ export function SemanticDiffViewer() {
                     </ResizablePanel>
                     <ResizableHandle />
                     <ResizablePanel
+                      panelRef={rightSidebarRef}
                       defaultSize="240px"
                       minSize="190px"
                       maxSize="360px"
