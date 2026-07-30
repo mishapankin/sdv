@@ -26,7 +26,10 @@ import {
 import { ComparisonSelector } from "@/components/comparison-controls";
 import { DiffSidebar } from "@/components/diff-sidebar";
 import { EntityDiffView } from "@/components/entity-diff-view";
-import { EntityPanel } from "@/components/entity-panel";
+import {
+  EntityPanel,
+  SemanticUnavailablePanel,
+} from "@/components/entity-panel";
 import {
   BinaryFileView,
   FileDiffView,
@@ -69,6 +72,7 @@ import {
 } from "@/lib/diff-query";
 import { groupByFile, hasFileInDiff } from "@/lib/group-changes";
 import { mergeModuleLevelChanges } from "@/lib/merge-module-changes";
+import { shouldShowSemanticSidebar } from "@/lib/semantic-sidebar";
 import type { FileOnlyChange } from "@/lib/sem-types";
 import { cn } from "@/lib/utils";
 
@@ -207,6 +211,15 @@ export function SemanticDiffViewer() {
         ? () => getFileDiff(fileDiffPath, comparison, activeRepoId)
         : skipToken,
   });
+  const selectedFileKind =
+    fileQuery.data?.ok === true ? fileQuery.data.data.kind : undefined;
+  const showSemanticSidebar =
+    diff !== undefined &&
+    shouldShowSemanticSidebar({
+      semanticAvailable: diff.semanticAvailable,
+      semanticChangeCount: selectedFileGroup?.changes.length ?? 0,
+      fileKind: selectedFileKind,
+    });
   const isRefreshing =
     repositoriesQuery.isFetching || query.isFetching || fileQuery.isFetching;
   const statusCommand = fileDiffPath
@@ -519,25 +532,33 @@ export function SemanticDiffViewer() {
                         />
                       ) : null}
                     </ResizablePanel>
-                    <ResizableHandle />
-                    <ResizablePanel
-                      panelRef={rightSidebarRef}
-                      defaultSize="240px"
-                      minSize="190px"
-                      maxSize="360px"
-                      groupResizeBehavior="preserve-pixel-size"
-                      collapsible
-                      collapsedSize="0px"
-                    >
-                      <EntityPanel
-                        fileGroup={selectedFileGroup}
-                        selectedEntityId={selectedEntityId}
-                        onSelectFullFile={() =>
-                          selectFile(effectiveSelectedFilePath)
-                        }
-                        onSelectEntity={selectEntity}
-                      />
-                    </ResizablePanel>
+                    {showSemanticSidebar ? (
+                      <>
+                        <ResizableHandle />
+                        <ResizablePanel
+                          panelRef={rightSidebarRef}
+                          defaultSize="240px"
+                          minSize="190px"
+                          maxSize="360px"
+                          groupResizeBehavior="preserve-pixel-size"
+                          collapsible
+                          collapsedSize="0px"
+                        >
+                          {diff.semanticAvailable ? (
+                            <EntityPanel
+                              fileGroup={selectedFileGroup}
+                              selectedEntityId={selectedEntityId}
+                              onSelectFullFile={() =>
+                                selectFile(effectiveSelectedFilePath)
+                              }
+                              onSelectEntity={selectEntity}
+                            />
+                          ) : (
+                            <SemanticUnavailablePanel />
+                          )}
+                        </ResizablePanel>
+                      </>
+                    ) : null}
                   </ResizablePanelGroup>
                 ) : null}
               </div>

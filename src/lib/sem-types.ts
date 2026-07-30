@@ -97,6 +97,7 @@ export type SemanticDiffResult =
         gitSummary: GitDiffSummary;
         repositoryName: string;
         branchName: string;
+        semanticAvailable: boolean;
         refreshedAt: string;
       };
     }

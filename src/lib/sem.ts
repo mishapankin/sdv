@@ -27,6 +27,7 @@ import {
   type FileDiffResult,
   type GitCommitsResult,
   type ImageSnapshot,
+  type SemDiff,
   semDiffSchema,
   type SemanticDiffResult,
 } from "@/lib/sem-types";
@@ -94,6 +95,63 @@ async function runBinary(
 
 function reportError(message: string) {
   console.error(`sdv: ${message}`);
+}
+
+function isMissingExecutable(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "ENOENT"
+  );
+}
+
+type OptionalSemDiff =
+  | { available: true; data: SemDiff }
+  | { available: false };
+
+async function readOptionalSemDiff(
+  comparison: ResolvedComparison,
+  cwd: string,
+  execute: CommandRunner,
+): Promise<OptionalSemDiff> {
+  try {
+    const { stdout } = await execute(
+      "sem",
+      getSemDiffArgs(comparison),
+      cwd,
+    );
+    let json: unknown;
+
+    try {
+      json = JSON.parse(stdout);
+    } catch (error) {
+      throw new Error(
+        `sem returned invalid JSON: ${getProcessError(error)}`,
+      );
+    }
+
+    const parsed = semDiffSchema.safeParse(json);
+
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      const location = issue?.path.length
+        ? ` at ${issue.path.join(".")}`
+        : "";
+
+      throw new Error(
+        `sem returned unexpected JSON${location}: ${issue?.message ?? "validation failed"}`,
+      );
+    }
+
+    return { available: true, data: parsed.data };
+  } catch (error) {
+    if (!isMissingExecutable(error)) {
+      reportError(getProcessError(error));
+    }
+
+    return { available: false };
+  }
 }
 
 function getContentHash(content: string) {
@@ -394,14 +452,14 @@ export async function readSemanticDiffFromRepository(
     );
     const shouldIncludeUntracked = resolvedComparison.mode === "changed";
     const [
-      { stdout },
+      semanticResult,
       branchResult,
       rootResult,
       trackedNumstat,
       trackedFiles,
       untrackedData,
     ] = await Promise.all([
-      execute("sem", getSemDiffArgs(resolvedComparison), cwd),
+      readOptionalSemDiff(resolvedComparison, cwd, execute),
       execute("git", ["branch", "--show-current"], cwd),
       execute("git", ["rev-parse", "--show-toplevel"], cwd),
       readGitDiffSummary(resolvedComparison, cwd, execute),
@@ -413,32 +471,28 @@ export async function readSemanticDiffFromRepository(
             summary: { fileCount: 0, additions: 0, deletions: 0 },
           }),
     ]);
-    let json: unknown;
-
-    try {
-      json = JSON.parse(stdout);
-    } catch (error) {
-      const message = `sem returned invalid JSON: ${getProcessError(error)}`;
-      reportError(message);
-      return { ok: false, error: message };
-    }
-
-    const parsed = semDiffSchema.safeParse(json);
-
-    if (!parsed.success) {
-      const issue = parsed.error.issues[0];
-      const location = issue?.path.length ? ` at ${issue.path.join(".")}` : "";
-      const message = `sem returned unexpected JSON${location}: ${issue?.message ?? "validation failed"}`;
-      reportError(message);
-
-      return {
-        ok: false,
-        error: message,
-      };
-    }
+    const semanticData = semanticResult.available
+      ? semanticResult.data
+      : {
+          summary: {
+            fileCount: 0,
+            added: 0,
+            modified: 0,
+            deleted: 0,
+            moved: 0,
+            renamed: 0,
+            reordered: 0,
+            binary: 0,
+            orphan: 0,
+            total: 0,
+          },
+          changes: [],
+          binaryChanges: [],
+          fileChanges: [],
+        };
 
     const binaryFilePaths = new Set(
-      parsed.data.binaryChanges.map((change) => change.filePath),
+      semanticData.binaryChanges.map((change) => change.filePath),
     );
     const trackedFileChanges = getTrackedFileChanges(trackedFiles).map(
       (change): FileOnlyChange =>
@@ -450,7 +504,7 @@ export async function readSemanticDiffFromRepository(
     return {
       ok: true,
       data: {
-        ...parsed.data,
+        ...semanticData,
         fileChanges: [
           ...trackedFileChanges,
           ...untrackedData.changes,
@@ -464,6 +518,7 @@ export async function readSemanticDiffFromRepository(
         ),
         repositoryName: path.basename(rootResult.stdout.trim()),
         branchName: branchResult.stdout.trim() || "detached HEAD",
+        semanticAvailable: semanticResult.available,
         refreshedAt: new Date().toISOString(),
       },
     };

@@ -60,29 +60,6 @@ export function preflightWorkspace(
     environment,
     platform,
   );
-  const semCheck = runVersionCheck(
-    "sem",
-    workspaceDirectory,
-    executableEnvironment,
-    execute,
-  );
-
-  if (semCheck.error?.code === "ENOENT") {
-    return {
-      ok: false,
-      code: "missing-sem",
-      error: "sdv: sem is missing from PATH",
-    };
-  }
-
-  if (semCheck.status !== 0) {
-    return {
-      ok: false,
-      code: "sem-failed",
-      error: (semCheck.stderr || "sdv: unable to run sem").trim(),
-    };
-  }
-
   const gitCheck = runVersionCheck(
     "git",
     workspaceDirectory,

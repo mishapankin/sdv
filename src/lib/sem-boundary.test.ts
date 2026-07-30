@@ -71,9 +71,10 @@ describe("sem process boundary", () => {
     });
     expect(result.data.repositoryName).toBe("example");
     expect(result.data.branchName).toBe("main");
+    expect(result.data.semanticAvailable).toBe(true);
   });
 
-  it("returns clear errors for invalid and unexpected sem JSON", async () => {
+  it("keeps Git diffs available for invalid and unexpected sem JSON", async () => {
     const consoleError = vi
       .spyOn(console, "error")
       .mockImplementation(() => undefined);
@@ -91,12 +92,12 @@ describe("sem process boundary", () => {
       );
 
       expect(invalid).toMatchObject({
-        ok: false,
-        error: expect.stringContaining("sem returned invalid JSON"),
+        ok: true,
+        data: { semanticAvailable: false, changes: [] },
       });
       expect(unexpected).toMatchObject({
-        ok: false,
-        error: expect.stringContaining("sem returned unexpected JSON"),
+        ok: true,
+        data: { semanticAvailable: false, changes: [] },
       });
     } finally {
       consoleError.mockRestore();
@@ -157,7 +158,41 @@ describe("sem process boundary", () => {
     });
   });
 
-  it("surfaces sem command failures", async () => {
+  it("keeps Git diffs available when sem is missing from PATH", async () => {
+    const runner: CommandRunner = vi.fn(async (command, args) => {
+      if (command === "sem") {
+        throw Object.assign(new Error("spawn sem ENOENT"), {
+          code: "ENOENT",
+        });
+      }
+
+      if (args[0] === "branch") {
+        return { stdout: "main\n", stderr: "" };
+      }
+
+      if (args[0] === "rev-parse") {
+        return { stdout: "/tmp/example\n", stderr: "" };
+      }
+
+      return { stdout: "", stderr: "" };
+    });
+
+    await expect(
+      readSemanticDiffFromRepository(
+        { mode: "staged" },
+        "/tmp/example",
+        runner,
+      ),
+    ).resolves.toMatchObject({
+      ok: true,
+      data: {
+        semanticAvailable: false,
+        changes: [],
+      },
+    });
+  });
+
+  it("keeps Git diffs available when the sem command fails", async () => {
     const consoleError = vi
       .spyOn(console, "error")
       .mockImplementation(() => undefined);
@@ -176,9 +211,13 @@ describe("sem process boundary", () => {
           "/tmp/example",
           runner,
         ),
-      ).resolves.toEqual({
-        ok: false,
-        error: "sem: parser crashed",
+      ).resolves.toMatchObject({
+        ok: true,
+        data: {
+          semanticAvailable: false,
+          changes: [],
+          fileChanges: [],
+        },
       });
     } finally {
       consoleError.mockRestore();

@@ -18,12 +18,13 @@ file status, while `sem` supplies semantic entity details where it can.
 - It starts a local web server on `localhost:1555` and prints
   `Running on localhost:1555`.
 - It does not need to open a browser automatically.
-- The default Changed comparison shows staged and unstaged changes from
-  `sem diff HEAD --verbose --format json` plus untracked files from Git status.
+- The default Changed comparison shows staged and unstaged changes from Git,
+  plus optional semantic entity details from
+  `sem diff HEAD --verbose --format json`.
 - The MVP supports the Changed comparison, staged changes, and comparisons
   between two user-provided Git refs.
-- Refresh reruns `sem` and refreshes Git file status; do not maintain a
-  separate diff cache.
+- Refresh refreshes Git file status and reruns `sem` when it is available; do
+  not maintain a separate diff cache.
 - The left sidebar is grouped by file. A separate right sidebar lists the
   selected file's changed semantic entities with a Lucide icon for entity type
   and a label/icon for change type such as added, modified, deleted, moved,
@@ -31,8 +32,8 @@ file status, while `sem` supplies semantic entity details where it can.
 - Untracked files are shown for the default Changed comparison as file-level
   Git changes. They do not have semantic entities unless `sem` returns them.
 - macOS and Linux are the supported platforms for the MVP.
-- Assume the `sem` binary is available through `PATH`. If it is missing, print
-  a clear error to stdout and exit without starting the web server.
+- Treat `sem` as optional. If it is unavailable, start in Git-only mode and
+  show installation guidance in the semantic sidebar.
 - Treat `sem` JSON as the source of truth for semantic entities. Treat Git
   status/diff output as the source of truth for repository dirty state,
   untracked files, and full-file diffs. Keep transformations limited to

@@ -43,7 +43,7 @@ function parsePort(value) {
 
 const program = new Command()
   .name("sdv")
-  .description("Run a local browser UI for semantic Git diffs")
+  .description("Run a local browser UI for Git diffs")
   .version(packageJson.version)
   .option("-p, --port <number>", "server port", parsePort, 1555)
   .option("--host <host>", "server host", "127.0.0.1")
@@ -60,9 +60,7 @@ if (!preflight.ok) {
     preflight.code === "invalid-repository"
       ? "sdv: current directory is not a Git worktree"
       : preflight.error;
-  const log = preflight.code === "missing-sem" ? console.log : console.error;
-
-  log(message);
+  console.error(message);
   process.exit(1);
 }
 

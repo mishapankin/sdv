@@ -10,6 +10,36 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import type { FileGroup } from "@/lib/group-changes";
 import { cn } from "@/lib/utils";
 
+export function SemanticUnavailablePanel() {
+  return (
+    <aside className="flex h-full min-w-0 flex-col bg-sidebar/60">
+      <div className="flex h-12 shrink-0 items-center border-b px-3">
+        <span className="text-[10px] font-semibold tracking-[0.12em] text-muted-foreground uppercase">
+          Semantic analysis
+        </span>
+      </div>
+      <div className="flex flex-1 items-center px-4">
+        <p className="text-xs leading-5 text-muted-foreground">
+          <span className="block font-medium text-foreground">
+            Semantic analysis is unavailable
+          </span>
+          Install{" "}
+          <a
+            href="https://github.com/ataraxy-labs/sem"
+            target="_blank"
+            rel="noreferrer"
+            className="font-mono text-sky-700 underline decoration-sky-700/30 underline-offset-2 hover:decoration-sky-700 dark:text-sky-300 dark:decoration-sky-300/30 dark:hover:decoration-sky-300"
+          >
+            sem
+          </a>{" "}
+          to <code className="font-mono text-foreground">$PATH</code> to
+          enable it
+        </p>
+      </div>
+    </aside>
+  );
+}
+
 export function EntityPanel({
   fileGroup,
   selectedEntityId,

@@ -29,7 +29,7 @@ describe("createExecutableEnvironment", () => {
 });
 
 describe("preflightWorkspace", () => {
-  it("rejects a missing directory before checking sem", () => {
+  it("rejects a missing directory before checking Git", () => {
     const { calls, execute } = createExecutor([]);
 
     expect(
@@ -45,25 +45,8 @@ describe("preflightWorkspace", () => {
     expect(calls).toHaveLength(0);
   });
 
-  it("reports a missing sem executable before checking Git", () => {
-    const { calls, execute } = createExecutor([
-      { error: { code: "ENOENT" }, status: null, stderr: "" },
-    ]);
-
-    expect(
-      preflightWorkspace("/tmp", { execute, platform: "linux" }),
-    ).toEqual({
-      ok: false,
-      code: "missing-sem",
-      error: "sdv: sem is missing from PATH",
-    });
-    expect(calls).toHaveLength(1);
-    expect(calls[0].command).toBe("sem");
-  });
-
   it("returns a normalized workspace and environment for a Git worktree", () => {
     const { calls, execute } = createExecutor([
-      { status: 0, stdout: "sem 1.0\n", stderr: "" },
       { status: 0, stdout: "git version 2.0\n", stderr: "" },
       { status: 0, stdout: "true\n", stderr: "" },
     ]);
@@ -81,8 +64,8 @@ describe("preflightWorkspace", () => {
         PATH: "/custom/bin:/usr/local/bin:/usr/bin:/bin",
       },
     });
-    expect(calls.map(({ command }) => command)).toEqual(["sem", "git", "git"]);
-    expect(calls[2].args).toEqual([
+    expect(calls.map(({ command }) => command)).toEqual(["git", "git"]);
+    expect(calls[1].args).toEqual([
       "rev-parse",
       "--is-inside-work-tree",
     ]);
@@ -90,7 +73,6 @@ describe("preflightWorkspace", () => {
 
   it("rejects a directory outside a Git worktree", () => {
     const { execute } = createExecutor([
-      { status: 0, stdout: "sem 1.0\n", stderr: "" },
       { status: 0, stdout: "git version 2.0\n", stderr: "" },
       { status: 128, stdout: "", stderr: "not a repository" },
     ]);

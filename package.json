@@ -1,7 +1,7 @@
 {
   "name": "sdv",
   "version": "0.1.0",
-  "description": "A local semantic Git diff viewer",
+  "description": "A local Git diff viewer with optional semantic analysis",
   "author": "SDV contributors",
   "private": true,
   "main": "./electron/main.mjs",

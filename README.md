@@ -13,7 +13,7 @@ server-side Git and `sem` integration.
 
 - macOS or Linux
 - Node.js 22.12+
-- `sem` available in `PATH`
+- Optional: `sem` available in `PATH` for semantic entity details
 - A Git worktree
 
 ## Run
@@ -89,5 +89,5 @@ pnpm electron:make
 ```
 
 The desktop application looks for `sem` in its inherited `PATH` and common
-Homebrew/system binary directories. If `sem` cannot be found, it shows an
-actionable error without starting the viewer.
+Homebrew/system binary directories. If `sem` cannot be found, the Git diff
+viewer remains available and the semantic sidebar shows installation guidance.

@@ -17,6 +17,7 @@ import {
   ipcMain,
   Menu,
   session,
+  shell,
   utilityProcess,
 } from "electron";
 
@@ -274,7 +275,13 @@ function createWindow() {
   });
 
   window.once("ready-to-show", () => window.show());
-  window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  window.webContents.setWindowOpenHandler(({ url }) => {
+    if (url === "https://github.com/ataraxy-labs/sem") {
+      void shell.openExternal(url);
+    }
+
+    return { action: "deny" };
+  });
   window.webContents.on("will-navigate", (event, url) => {
     if (
       url !== launcherUrl &&
