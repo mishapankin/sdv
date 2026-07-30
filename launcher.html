@@ -13,17 +13,6 @@
   </head>
   <body>
     <div class="app-shell">
-      <header class="app-header">
-        <div class="app-header__identity">
-          <span class="app-header__brand">SDV</span>
-          <span class="app-header__divider" aria-hidden="true"></span>
-          <span class="app-header__section">Workspaces</span>
-        </div>
-        <button class="open-button" id="open-workspace" type="button">
-          Open workspace…
-        </button>
-      </header>
-
       <main class="launcher-main">
         <section class="workspace-section" aria-labelledby="recent-heading">
           <div class="workspace-section__heading">
@@ -31,7 +20,9 @@
               <h1>Workspaces</h1>
               <p>Open a Git repository to inspect its current changes.</p>
             </div>
-            <span class="recent-count" id="recent-count"></span>
+            <button class="open-button" id="open-workspace" type="button">
+              Open Workspace
+            </button>
           </div>
 
           <div class="workspace-panel">

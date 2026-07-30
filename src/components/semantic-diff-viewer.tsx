@@ -250,26 +250,25 @@ export function SemanticDiffViewer() {
       <TooltipProvider>
         <div className="flex h-dvh min-h-[520px] flex-col overflow-hidden bg-background">
         <header className="flex h-14 shrink-0 items-center gap-4 overflow-x-auto border-b bg-card px-4">
-          <div className="flex min-w-0 shrink-0 items-center gap-4">
-            <span className="text-[15px] font-semibold tracking-tight">
-              SDV
-            </span>
+          {diff ? (
+            <div className="hidden min-w-0 shrink-0 items-center gap-2 text-xs text-muted-foreground sm:flex">
+              <span className="max-w-36 truncate font-medium text-foreground">
+                {diff.repositoryName}
+              </span>
+              <span className="text-muted-foreground/50">/</span>
+              <GitBranch className="size-3.5" />
+              <span className="max-w-36 truncate font-mono">
+                {diff.branchName}
+              </span>
+            </div>
+          ) : null}
 
-            {diff ? (
-              <div className="hidden min-w-0 items-center gap-2 border-l pl-4 text-xs text-muted-foreground sm:flex">
-                <span className="max-w-36 truncate font-medium text-foreground">
-                  {diff.repositoryName}
-                </span>
-                <span className="text-muted-foreground/50">/</span>
-                <GitBranch className="size-3.5" />
-                <span className="max-w-36 truncate font-mono">
-                  {diff.branchName}
-                </span>
-              </div>
-            ) : null}
-          </div>
-
-          <div className="flex min-w-max flex-1 items-center gap-3 border-l pl-4">
+          <div
+            className={cn(
+              "flex min-w-max flex-1 items-center gap-3",
+              diff && "border-l pl-4",
+            )}
+          >
             <div className="flex shrink-0 items-center gap-2 text-xs font-medium text-muted-foreground">
               <GitCommitHorizontal className="size-4" />
               Compare

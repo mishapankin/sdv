@@ -1,11 +1,5 @@
 const workspaceList = document.querySelector("#workspace-list");
 const openWorkspaceButton = document.querySelector("#open-workspace");
-const recentCount = document.querySelector("#recent-count");
-
-function updateRecentCount() {
-  const count = workspaceList.querySelectorAll(".workspace-row").length;
-  recentCount.textContent = count ? `${count} recent` : "";
-}
 
 function formatLastOpened(value) {
   if (!value) return "Previously opened";
@@ -90,7 +84,6 @@ function createWorkspaceRow(repository) {
     forgetButton.disabled = true;
     await window.sdvDesktop.forgetRepository(repository.path);
     row.remove();
-    updateRecentCount();
 
     if (!workspaceList.children.length) {
       renderEmptyState();
@@ -103,7 +96,6 @@ function createWorkspaceRow(repository) {
 
 function renderEmptyState() {
   workspaceList.replaceChildren();
-  recentCount.textContent = "";
 
   const empty = document.createElement("div");
   empty.className = "empty-state";
@@ -125,7 +117,6 @@ async function loadRecentRepositories() {
     workspaceList.replaceChildren(
       ...repositories.map(createWorkspaceRow),
     );
-    updateRecentCount();
 
     if (!repositories.length) renderEmptyState();
   } catch (error) {
