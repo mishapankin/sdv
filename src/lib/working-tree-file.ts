@@ -9,10 +9,7 @@ export type WorkingTreeFile = {
   binary: boolean;
 };
 
-export async function readWorkingTreeFile(
-  cwd: string,
-  filePath: string,
-): Promise<WorkingTreeFile> {
+function resolveFilePath(cwd: string, filePath: string) {
   const absolutePath = path.resolve(cwd, filePath);
   const relativePath = path.relative(cwd, absolutePath);
 
@@ -23,6 +20,34 @@ export async function readWorkingTreeFile(
   ) {
     throw new Error(`invalid file path: ${filePath}`);
   }
+
+  return absolutePath;
+}
+
+export async function readWorkingTreeBuffer(
+  cwd: string,
+  filePath: string,
+  maxBytes: number,
+): Promise<Buffer | null> {
+  const absolutePath = resolveFilePath(cwd, filePath);
+  const fileStats = await lstat(absolutePath);
+
+  if (!fileStats.isFile()) {
+    throw new Error(`unsupported file type: ${filePath}`);
+  }
+
+  if (fileStats.size > maxBytes) {
+    return null;
+  }
+
+  return readFile(absolutePath);
+}
+
+export async function readWorkingTreeFile(
+  cwd: string,
+  filePath: string,
+): Promise<WorkingTreeFile> {
+  const absolutePath = resolveFilePath(cwd, filePath);
 
   try {
     const fileStats = await lstat(absolutePath);

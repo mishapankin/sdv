@@ -17,15 +17,24 @@ import {
   parseGitNumstat,
 } from "@/lib/git-stats";
 import {
+  createImageSnapshot,
+  hasPreviewableImageExtension,
+  MAX_IMAGE_PREVIEW_BYTES,
+} from "@/lib/image-preview";
+import {
   type Comparison,
   type FileOnlyChange,
-  semDiffSchema,
   type FileDiffResult,
   type GitCommitsResult,
+  type ImageSnapshot,
+  semDiffSchema,
   type SemanticDiffResult,
 } from "@/lib/sem-types";
 import { getProcessError } from "@/lib/process-error";
-import { readWorkingTreeFile } from "@/lib/working-tree-file";
+import {
+  readWorkingTreeBuffer,
+  readWorkingTreeFile,
+} from "@/lib/working-tree-file";
 import { resolveRepositoryDirectory } from "@/lib/workspace";
 
 const execFileAsync = promisify(execFile);
@@ -35,11 +44,22 @@ type CommandOutput = {
   stderr: string;
 };
 
+type BinaryCommandOutput = {
+  stdout: Buffer;
+  stderr: Buffer;
+};
+
 export type CommandRunner = (
   command: string,
   args: string[],
   cwd: string,
 ) => Promise<CommandOutput>;
+
+type BinaryCommandRunner = (
+  command: string,
+  args: string[],
+  cwd: string,
+) => Promise<BinaryCommandOutput>;
 
 async function run(
   command: string,
@@ -53,6 +73,23 @@ async function run(
   });
 
   return { stdout, stderr };
+}
+
+async function runBinary(
+  command: string,
+  args: string[],
+  cwd: string,
+): Promise<BinaryCommandOutput> {
+  const { stdout, stderr } = await execFileAsync(command, args, {
+    cwd,
+    encoding: null,
+    maxBuffer: MAX_IMAGE_PREVIEW_BYTES + 1024,
+  });
+
+  return {
+    stdout: Buffer.isBuffer(stdout) ? stdout : Buffer.from(stdout),
+    stderr: Buffer.isBuffer(stderr) ? stderr : Buffer.from(stderr),
+  };
 }
 
 function reportError(message: string) {
@@ -259,6 +296,51 @@ async function readIndexFile(
   return readGitBlob(cwd, "", filePath, execute);
 }
 
+async function readGitImageSnapshot(
+  cwd: string,
+  ref: string,
+  filePath: string,
+  execute: CommandRunner,
+  executeBinary: BinaryCommandRunner,
+): Promise<ImageSnapshot | null> {
+  const objectName = `${ref}:${filePath}`;
+  const { stdout: sizeOutput } = await execute(
+    "git",
+    ["cat-file", "-s", objectName],
+    cwd,
+  );
+  const byteSize = Number.parseInt(sizeOutput.trim(), 10);
+
+  if (!Number.isSafeInteger(byteSize) || byteSize < 0) {
+    throw new Error(`git returned an invalid blob size for ${filePath}`);
+  }
+
+  if (byteSize > MAX_IMAGE_PREVIEW_BYTES) {
+    return null;
+  }
+
+  const { stdout } = await executeBinary(
+    "git",
+    ["show", objectName],
+    cwd,
+  );
+
+  return createImageSnapshot(stdout);
+}
+
+async function readWorkingTreeImageSnapshot(
+  cwd: string,
+  filePath: string,
+): Promise<ImageSnapshot | null> {
+  const content = await readWorkingTreeBuffer(
+    cwd,
+    filePath,
+    MAX_IMAGE_PREVIEW_BYTES,
+  );
+
+  return content ? createImageSnapshot(content) : null;
+}
+
 async function isBinaryChange(
   diffArgs: string[],
   cwd: string,
@@ -416,6 +498,7 @@ export async function readFileDiffFromRepository(
   comparison: Comparison,
   cwd: string,
   execute: CommandRunner = run,
+  executeBinary: BinaryCommandRunner = runBinary,
 ): Promise<FileDiffResult> {
   try {
     const resolvedComparison = await resolveComparison(
@@ -439,6 +522,24 @@ export async function readFileDiffFromRepository(
       const workingTreeFile = await readWorkingTreeFile(cwd, filePath);
 
       if (workingTreeFile.binary) {
+        if (hasPreviewableImageExtension(filePath)) {
+          const after = await readWorkingTreeImageSnapshot(cwd, filePath);
+
+          if (after) {
+            return {
+              ok: true,
+              data: {
+                kind: "image",
+                filePath,
+                oldFilePath: filePath,
+                before: null,
+                after,
+                cacheKey: `untracked-image:${filePath}:${getContentHash(after.dataUrl)}`,
+              },
+            };
+          }
+        }
+
         return {
           ok: true,
           data: {
@@ -474,6 +575,62 @@ export async function readFileDiffFromRepository(
     const { oldFilePath, status } = changedFile;
 
     if (await isBinaryChange(diffArgs, cwd, filePath, execute)) {
+      if (
+        hasPreviewableImageExtension(filePath) ||
+        hasPreviewableImageExtension(oldFilePath)
+      ) {
+        const oldRef =
+          resolvedComparison.mode === "changed"
+            ? resolvedComparison.base
+            : resolvedComparison.mode === "commits"
+              ? resolvedComparison.from
+              : "HEAD";
+        const expectsBefore = status !== "A" && status !== "C";
+        const expectsAfter = status !== "D";
+        const [before, after] = await Promise.all([
+          expectsBefore
+            ? readGitImageSnapshot(
+                cwd,
+                oldRef,
+                oldFilePath,
+                execute,
+                executeBinary,
+              )
+            : Promise.resolve(null),
+          expectsAfter
+            ? resolvedComparison.mode === "changed"
+              ? readWorkingTreeImageSnapshot(cwd, filePath)
+              : readGitImageSnapshot(
+                  cwd,
+                  resolvedComparison.mode === "commits"
+                    ? resolvedComparison.to
+                    : "",
+                  filePath,
+                  execute,
+                  executeBinary,
+                )
+            : Promise.resolve(null),
+        ]);
+
+        if ((!expectsBefore || before) && (!expectsAfter || after)) {
+          const imageHash = getContentHash(
+            `${before?.dataUrl ?? ""}:${after?.dataUrl ?? ""}`,
+          );
+
+          return {
+            ok: true,
+            data: {
+              kind: "image",
+              filePath,
+              oldFilePath,
+              before,
+              after,
+              cacheKey: `${comparison.mode}:image:${oldFilePath}:${filePath}:${imageHash}`,
+            },
+          };
+        }
+      }
+
       return {
         ok: true,
         data: {

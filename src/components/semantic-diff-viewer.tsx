@@ -31,6 +31,7 @@ import {
   BinaryFileView,
   FileDiffView,
 } from "@/components/file-diff-view";
+import { ImageDiffView } from "@/components/image-diff-view";
 import { RepositoryRail } from "@/components/repository-rail";
 import { ThemeToggle, useTheme } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -460,6 +461,18 @@ export function SemanticDiffViewer() {
                           theme={theme}
                           comparison={comparison}
                           target={fileTarget}
+                        />
+                      ) : null}
+                      {fileDiffPath &&
+                      fileQuery.data?.ok &&
+                      fileQuery.data.data.kind === "image" ? (
+                        <ImageDiffView
+                          key={fileQuery.data.data.cacheKey}
+                          filePath={fileQuery.data.data.filePath}
+                          oldFilePath={fileQuery.data.data.oldFilePath}
+                          before={fileQuery.data.data.before}
+                          after={fileQuery.data.data.after}
+                          comparison={comparison}
                         />
                       ) : null}
                       {fileDiffPath &&

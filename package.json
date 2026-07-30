@@ -24,6 +24,7 @@
     "sdv": "node ./bin/sdv.mjs"
   },
   "dependencies": {
+    "@panzoom/panzoom": "^4.6.2",
     "@pierre/diffs": "^1.2.12",
     "@tanstack/react-query": "^5.101.4",
     "class-variance-authority": "^0.7.1",

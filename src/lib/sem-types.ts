@@ -105,6 +105,12 @@ export type SemanticDiffResult =
       error: string;
     };
 
+export type ImageSnapshot = {
+  dataUrl: string;
+  mimeType: string;
+  byteSize: number;
+};
+
 export type FileDiffResult =
   | {
       ok: true;
@@ -115,6 +121,14 @@ export type FileDiffResult =
             oldFilePath: string;
             oldContent: string;
             newContent: string;
+            cacheKey: string;
+          }
+        | {
+            kind: "image";
+            filePath: string;
+            oldFilePath: string;
+            before: ImageSnapshot | null;
+            after: ImageSnapshot | null;
             cacheKey: string;
           }
         | {

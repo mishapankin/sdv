@@ -16,6 +16,14 @@ import { readFileDiffFromRepository } from "@/lib/sem";
 
 const execFileAsync = promisify(execFile);
 const repositories: string[] = [];
+const PNG_A = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+  "base64",
+);
+const PNG_B = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2nKAAAAAASUVORK5CYII=",
+  "base64",
+);
 
 async function git(cwd: string, args: string[]) {
   const { stdout } = await execFileAsync("git", args, {
@@ -145,6 +153,104 @@ describe("file diff repository integration", () => {
         kind: "text",
         oldContent: "",
         newContent: "staged addition\n",
+      },
+    });
+  });
+
+  it("loads single and side-by-side image snapshots from the working tree", async () => {
+    const cwd = await createRepository();
+    await writeFile(path.join(cwd, "deleted.png"), PNG_A);
+    await writeFile(path.join(cwd, "modified.png"), PNG_A);
+    await git(cwd, ["add", "."]);
+    await git(cwd, ["commit", "--quiet", "-m", "add images"]);
+
+    await unlink(path.join(cwd, "deleted.png"));
+    await writeFile(path.join(cwd, "modified.png"), PNG_B);
+    await writeFile(path.join(cwd, "added.png"), PNG_B);
+
+    const [deleted, modified, added] = await Promise.all([
+      readFileDiffFromRepository(
+        "deleted.png",
+        { mode: "changed" },
+        cwd,
+      ),
+      readFileDiffFromRepository(
+        "modified.png",
+        { mode: "changed" },
+        cwd,
+      ),
+      readFileDiffFromRepository(
+        "added.png",
+        { mode: "changed" },
+        cwd,
+      ),
+    ]);
+
+    expect(deleted).toMatchObject({
+      ok: true,
+      data: {
+        kind: "image",
+        before: { mimeType: "image/png", byteSize: PNG_A.length },
+        after: null,
+      },
+    });
+    expect(modified).toMatchObject({
+      ok: true,
+      data: {
+        kind: "image",
+        before: { mimeType: "image/png", byteSize: PNG_A.length },
+        after: { mimeType: "image/png", byteSize: PNG_B.length },
+      },
+    });
+    expect(added).toMatchObject({
+      ok: true,
+      data: {
+        kind: "image",
+        before: null,
+        after: { mimeType: "image/png", byteSize: PNG_B.length },
+      },
+    });
+  });
+
+  it("loads image snapshots from the index and between commits", async () => {
+    const cwd = await createRepository();
+    await writeFile(path.join(cwd, "staged.png"), PNG_A);
+    await git(cwd, ["add", "staged.png"]);
+    await git(cwd, ["commit", "--quiet", "-m", "add staged image"]);
+    const base = await git(cwd, ["rev-parse", "HEAD"]);
+
+    await writeFile(path.join(cwd, "staged.png"), PNG_B);
+    await git(cwd, ["add", "staged.png"]);
+
+    const staged = await readFileDiffFromRepository(
+      "staged.png",
+      { mode: "staged" },
+      cwd,
+    );
+
+    expect(staged).toMatchObject({
+      ok: true,
+      data: {
+        kind: "image",
+        before: { mimeType: "image/png", byteSize: PNG_A.length },
+        after: { mimeType: "image/png", byteSize: PNG_B.length },
+      },
+    });
+
+    await git(cwd, ["commit", "--quiet", "-m", "modify staged image"]);
+    const head = await git(cwd, ["rev-parse", "HEAD"]);
+    const commits = await readFileDiffFromRepository(
+      "staged.png",
+      { mode: "commits", from: base, to: head },
+      cwd,
+    );
+
+    expect(commits).toMatchObject({
+      ok: true,
+      data: {
+        kind: "image",
+        before: { mimeType: "image/png", byteSize: PNG_A.length },
+        after: { mimeType: "image/png", byteSize: PNG_B.length },
       },
     });
   });
