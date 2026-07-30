@@ -16,6 +16,7 @@ import {
   dialog,
   ipcMain,
   Menu,
+  nativeTheme,
   session,
   shell,
   utilityProcess,
@@ -383,6 +384,17 @@ async function selectRepository() {
 }
 
 function installIpcHandlers() {
+  ipcMain.handle("sdv:set-theme", (event, theme) => {
+    if (!isTrustedSender(event)) {
+      throw new Error("untrusted IPC sender");
+    }
+    if (theme !== "light" && theme !== "dark") {
+      throw new Error("invalid theme");
+    }
+
+    nativeTheme.themeSource = theme;
+  });
+
   ipcMain.handle("sdv:get-current-repository", (event) => {
     if (!isTrustedSender(event)) {
       throw new Error("untrusted IPC sender");

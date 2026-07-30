@@ -24,19 +24,22 @@ const HIDE_INTERNAL_HORIZONTAL_SCROLLBAR_CSS = `
   }
 `;
 
+const DIFF_THEMES = {
+  light: "pierre-light",
+  dark: "pierre-dark",
+} as const;
+
 export function DiffCodeView({
   codeViewRef,
   containerRef,
   fileDiff,
   itemId,
-  theme,
   syncKey,
 }: {
   codeViewRef: RefObject<CodeViewHandle<undefined> | null>;
   containerRef: RefObject<HTMLDivElement | null>;
   fileDiff: FileDiffMetadata;
   itemId: string;
-  theme: "light" | "dark";
   syncKey: string;
 }) {
   const items = useMemo<CodeViewItem[]>(
@@ -55,7 +58,7 @@ export function DiffCodeView({
           diffStyle: "split",
           diffIndicators: "bars",
           lineDiffType: "word-alt",
-          theme: theme === "dark" ? "pierre-dark" : "pierre-light",
+          theme: DIFF_THEMES,
           overflow: "scroll",
           disableFileHeader: true,
           expandUnchanged: shouldExpandUnchanged(fileDiff),

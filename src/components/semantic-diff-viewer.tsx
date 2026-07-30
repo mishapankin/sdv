@@ -36,7 +36,7 @@ import {
 } from "@/components/file-diff-view";
 import { ImageDiffView } from "@/components/image-diff-view";
 import { RepositoryRail } from "@/components/repository-rail";
-import { ThemeToggle, useTheme } from "@/components/theme-toggle";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import {
   ResizableHandle,
@@ -90,7 +90,6 @@ const DIFF_HIGHLIGHTER_OPTIONS = {
 };
 
 export function SemanticDiffViewer() {
-  const theme = useTheme();
   const queryClient = useQueryClient();
   const leftSidebarRef = usePanelRef();
   const rightSidebarRef = usePanelRef();
@@ -471,7 +470,6 @@ export function SemanticDiffViewer() {
                           oldContent={fileQuery.data.data.oldContent}
                           newContent={fileQuery.data.data.newContent}
                           cacheKey={fileQuery.data.data.cacheKey}
-                          theme={theme}
                           comparison={comparison}
                           target={fileTarget}
                         />
@@ -502,7 +500,6 @@ export function SemanticDiffViewer() {
                         <EntityDiffView
                           key={`${selectedChange.entityId}:${diff.refreshedAt}`}
                           change={selectedChange}
-                          theme={theme}
                           renderVersion={diff.refreshedAt}
                           onViewInContext={(target) =>
                             setSelection({

@@ -1,7 +1,7 @@
 "use client";
 
 import { Moon, Sun } from "lucide-react";
-import { useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -35,11 +35,20 @@ export function useTheme() {
 export function ThemeToggle() {
   const theme = useTheme();
 
+  useEffect(() => {
+    void window.sdvDesktop?.setTheme(getTheme());
+  }, []);
+
   function toggleTheme() {
     const nextTheme: Theme = theme === "dark" ? "light" : "dark";
-    document.documentElement.classList.toggle("dark", nextTheme === "dark");
+    const root = document.documentElement;
+
+    root.classList.add("theme-switching");
+    root.classList.toggle("dark", nextTheme === "dark");
     localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+    void window.sdvDesktop?.setTheme(nextTheme);
     window.dispatchEvent(new Event(THEME_EVENT));
+    requestAnimationFrame(() => root.classList.remove("theme-switching"));
   }
 
   return (

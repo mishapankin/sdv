@@ -11,4 +11,5 @@ contextBridge.exposeInMainWorld("sdvDesktop", {
   openRepository: () => ipcRenderer.invoke("sdv:open-repository"),
   openRecentRepository: (directory) =>
     ipcRenderer.invoke("sdv:open-recent-repository", directory),
+  setTheme: (theme) => ipcRenderer.invoke("sdv:set-theme", theme),
 });

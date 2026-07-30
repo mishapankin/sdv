@@ -22,7 +22,6 @@ export function FileDiffView({
   oldContent,
   newContent,
   cacheKey,
-  theme,
   comparison,
   target,
 }: {
@@ -31,7 +30,6 @@ export function FileDiffView({
   oldContent: string;
   newContent: string;
   cacheKey: string;
-  theme: "light" | "dark";
   comparison: Comparison;
   target?: DiffLineTarget;
 }) {
@@ -137,7 +135,6 @@ export function FileDiffView({
           containerRef={diffRootRef}
           fileDiff={fileDiff}
           itemId={itemId}
-          theme={theme}
           syncKey={cacheKey}
         />
       ) : (

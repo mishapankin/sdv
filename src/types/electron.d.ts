@@ -21,6 +21,7 @@ declare global {
       openRecentRepository(path: string): Promise<
         { ok: true } | { ok: false; error: string }
       >;
+      setTheme(theme: "light" | "dark"): Promise<void>;
     };
   }
 }

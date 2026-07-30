@@ -54,14 +54,12 @@ function createEntityFileDiff(
 
 export function EntityDiffView({
   change,
-  theme,
   renderVersion,
   onPreviousEntity,
   onNextEntity,
   onViewInContext,
 }: {
   change: SemanticChange;
-  theme: "light" | "dark";
   renderVersion: string;
   onPreviousEntity?: () => void;
   onNextEntity?: () => void;
@@ -205,7 +203,6 @@ export function EntityDiffView({
         containerRef={diffRootRef}
         fileDiff={fileDiff}
         itemId={itemId}
-        theme={theme}
         syncKey={`${change.entityId}:${renderVersion}`}
       />
     </main>
