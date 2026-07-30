@@ -514,32 +514,40 @@ if (hasSingleInstanceLock) {
     }
   });
 
-  app.whenReady().then(async () => {
-    installSessionGuards();
-    installIpcHandlers();
-    installApplicationMenu();
-    mainWindow = createWindow();
+  app
+    .whenReady()
+    .then(async () => {
+      installSessionGuards();
+      installIpcHandlers();
+      installApplicationMenu();
+      mainWindow = createWindow();
 
-    const initialWorkspace = pendingWorkspace || requestedWorkspace;
-    pendingWorkspace = undefined;
+      const initialWorkspace = pendingWorkspace || requestedWorkspace;
+      pendingWorkspace = undefined;
 
-    if (initialWorkspace) {
-      const result = await enqueueOpenWorkspace(initialWorkspace);
-      if (!result.ok) {
+      if (initialWorkspace) {
+        const result = await enqueueOpenWorkspace(initialWorkspace);
+        if (!result.ok) {
+          await enqueueShowLauncher();
+        }
+      } else {
         await enqueueShowLauncher();
       }
-    } else {
-      await enqueueShowLauncher();
-    }
 
-    initializing = false;
+      initializing = false;
 
-    if (pendingWorkspace) {
-      const workspace = pendingWorkspace;
-      pendingWorkspace = undefined;
-      void enqueueOpenWorkspace(workspace);
-    }
-  });
+      if (pendingWorkspace) {
+        const workspace = pendingWorkspace;
+        pendingWorkspace = undefined;
+        void enqueueOpenWorkspace(workspace);
+      }
+    })
+    .catch((error) => {
+      const message = `sdv: unable to initialize the desktop application: ${error.message}`;
+      console.error(message);
+      dialog.showErrorBox("Unable to start SDV", message);
+      app.quit();
+    });
 
   app.on("window-all-closed", () => app.quit());
 

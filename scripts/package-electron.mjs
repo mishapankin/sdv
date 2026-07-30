@@ -66,7 +66,10 @@ export async function packageElectron({
       [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,
       [FuseV1Options.OnlyLoadAppFromAsar]: true,
       [FuseV1Options.LoadBrowserProcessSpecificV8Snapshot]: false,
-      [FuseV1Options.GrantFileProtocolExtraPrivileges]: false,
+      // The trusted, CSP-restricted workspace launcher is loaded from app.asar
+      // through file://. Disable this only after migrating it to a custom
+      // protocol.
+      [FuseV1Options.GrantFileProtocolExtraPrivileges]: true,
       [FuseV1Options.WasmTrapHandlers]: true,
     });
   }
