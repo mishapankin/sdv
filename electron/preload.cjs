@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld("sdvDesktop", {
   openRepository: () => ipcRenderer.invoke("sdv:open-repository"),
   openRecentRepository: (directory) =>
     ipcRenderer.invoke("sdv:open-recent-repository", directory),
+  getTheme: () => ipcRenderer.invoke("sdv:get-theme"),
   setTheme: (theme) => ipcRenderer.invoke("sdv:set-theme", theme),
   getWindowControls: () => ipcRenderer.invoke("sdv:get-window-controls"),
   setWindowControls: (mode) =>

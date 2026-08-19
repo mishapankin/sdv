@@ -25,16 +25,19 @@ import {
 import { getRequestedWorkspace } from "./arguments.mjs";
 import { createOperationQueue } from "./operation-queue.mjs";
 import {
+  getDefaultDesktopSettings,
+  getDefaultWindowControls,
+  parseDesktopSettings,
+  serializeDesktopSettings,
+  THEME_MODES,
+  WINDOW_CONTROL_MODES,
+} from "./desktop-settings.mjs";
+import {
   forgetRecentRepository,
   parseRecentRepositories,
   rememberRecentRepository,
   serializeRecentRepositories,
 } from "./recent-repositories.mjs";
-import {
-  getDefaultWindowControls,
-  parseWindowControls,
-  WINDOW_CONTROL_MODES,
-} from "./window-controls.mjs";
 import { DESKTOP_TOKEN_HEADER } from "../runtime/constants.mjs";
 import { preflightWorkspace } from "../runtime/preflight.mjs";
 import {
@@ -63,8 +66,9 @@ let activeRepository;
 let initializing = true;
 let pendingWorkspace;
 let quitting = false;
-let windowControlsMode = getDefaultWindowControls(process.platform);
+let desktopSettings = getDefaultDesktopSettings(process.platform);
 const enqueueWorkspaceOperation = createOperationQueue();
+const enqueueSettingsWrite = createOperationQueue();
 
 const requestedWorkspace = getRequestedWorkspace(process.argv);
 const hasSingleInstanceLock = app.requestSingleInstanceLock(
@@ -79,22 +83,30 @@ function getRecentRepositoriesPath() {
   return path.join(app.getPath("userData"), "recent-repositories.json");
 }
 
-function getDesktopPreferencesPath() {
-  return path.join(app.getPath("userData"), "preferences.json");
+function getDesktopSettingsPath() {
+  return path.join(app.getPath("userData"), "settings.json");
 }
 
-async function readWindowControlsPreference() {
-  try {
-    const contents = await readFile(getDesktopPreferencesPath(), "utf8");
-    const preferences = JSON.parse(contents);
-    return parseWindowControls(preferences?.windowControls, process.platform);
-  } catch {
-    return getDefaultWindowControls(process.platform);
+async function readDesktopSettings() {
+  const candidates = [
+    getDesktopSettingsPath(),
+    path.join(app.getPath("userData"), "preferences.json"),
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      const contents = await readFile(candidate, "utf8");
+      return parseDesktopSettings(JSON.parse(contents), process.platform);
+    } catch {
+      // Try the legacy preferences file before falling back to defaults.
+    }
   }
+
+  return getDefaultDesktopSettings(process.platform);
 }
 
-async function writeWindowControlsPreference(mode) {
-  const destination = getDesktopPreferencesPath();
+async function writeDesktopSettings(settings) {
+  const destination = getDesktopSettingsPath();
   const temporaryPath = `${destination}.${process.pid}-${randomBytes(6).toString("hex")}.tmp`;
 
   await mkdir(path.dirname(destination), { recursive: true });
@@ -102,7 +114,7 @@ async function writeWindowControlsPreference(mode) {
   try {
     await writeFile(
       temporaryPath,
-      `${JSON.stringify({ windowControls: mode }, null, 2)}\n`,
+      serializeDesktopSettings(settings),
       "utf8",
     );
     await rename(temporaryPath, destination);
@@ -110,6 +122,11 @@ async function writeWindowControlsPreference(mode) {
     await rm(temporaryPath, { force: true });
     throw error;
   }
+}
+
+async function updateDesktopSettings(patch) {
+  desktopSettings = { ...desktopSettings, ...patch };
+  await enqueueSettingsWrite(() => writeDesktopSettings(desktopSettings));
 }
 
 async function readRecentRepositories() {
@@ -301,7 +318,8 @@ function isTrustedSender(event) {
 
 function createWindow(bounds) {
   const useCustomControls =
-    process.platform !== "darwin" && windowControlsMode !== "native";
+    process.platform !== "darwin" &&
+    desktopSettings.windowControls !== "native";
   const window = new BrowserWindow({
     title: "SDV",
     width: 1440,
@@ -467,14 +485,23 @@ async function selectRepository() {
 }
 
 function installIpcHandlers() {
-  ipcMain.handle("sdv:set-theme", (event, theme) => {
+  ipcMain.handle("sdv:get-theme", (event) => {
     if (!isTrustedSender(event)) {
       throw new Error("untrusted IPC sender");
     }
-    if (theme !== "system" && theme !== "light" && theme !== "dark") {
+
+    return desktopSettings.theme;
+  });
+
+  ipcMain.handle("sdv:set-theme", async (event, theme) => {
+    if (!isTrustedSender(event)) {
+      throw new Error("untrusted IPC sender");
+    }
+    if (!THEME_MODES.has(theme)) {
       throw new Error("invalid theme");
     }
 
+    await updateDesktopSettings({ theme });
     nativeTheme.themeSource = theme;
   });
 
@@ -484,7 +511,7 @@ function installIpcHandlers() {
     }
 
     return {
-      mode: windowControlsMode,
+      mode: desktopSettings.windowControls,
       defaultMode: getDefaultWindowControls(process.platform),
       platform: process.platform,
     };
@@ -501,10 +528,10 @@ function installIpcHandlers() {
       throw new Error("invalid window controls mode");
     }
 
-    await writeWindowControlsPreference(mode);
+    const changed = desktopSettings.windowControls !== mode;
+    await updateDesktopSettings({ windowControls: mode });
 
-    if (windowControlsMode !== mode) {
-      windowControlsMode = mode;
+    if (changed) {
       setTimeout(() => {
         void recreateMainWindow().catch((error) => {
           console.error(`sdv: unable to apply window controls: ${error.message}`);
@@ -703,7 +730,13 @@ if (hasSingleInstanceLock) {
   app
     .whenReady()
     .then(async () => {
-      windowControlsMode = await readWindowControlsPreference();
+      desktopSettings = await readDesktopSettings();
+      try {
+        await writeDesktopSettings(desktopSettings);
+      } catch (error) {
+        console.error(`sdv: unable to persist settings: ${error.message}`);
+      }
+      nativeTheme.themeSource = desktopSettings.theme;
       installSessionGuards();
       installIpcHandlers();
       installApplicationMenu();

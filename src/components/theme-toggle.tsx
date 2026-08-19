@@ -1,5 +1,6 @@
 "use client";
 
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useSyncExternalStore } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,14 @@ function getServerTheme(): Theme {
   return "system";
 }
 
+function subscribeToDesktop() {
+  return () => {};
+}
+
+function getDesktop() {
+  return window.sdvDesktop !== undefined;
+}
+
 export function useTheme() {
   return useSyncExternalStore<Theme>(subscribe, getTheme, getServerTheme);
 }
@@ -47,7 +56,11 @@ function applyResolvedTheme(theme: "light" | "dark") {
 }
 
 async function applyTheme(theme: Theme) {
-  localStorage.setItem(THEME_STORAGE_KEY, theme);
+  if (window.sdvDesktop) {
+    localStorage.removeItem(THEME_STORAGE_KEY);
+  } else {
+    localStorage.setItem(THEME_STORAGE_KEY, theme);
+  }
   window.dispatchEvent(new Event(THEME_EVENT));
 
   await window.sdvDesktop?.setTheme(theme);
@@ -55,23 +68,39 @@ async function applyTheme(theme: Theme) {
 }
 
 export function ThemeSwitcher() {
-  const theme = useTheme();
+  const queryClient = useQueryClient();
+  const localTheme = useTheme();
+  const desktop = useSyncExternalStore(
+    subscribeToDesktop,
+    getDesktop,
+    () => false,
+  );
+  const desktopThemeQuery = useQuery({
+    queryKey: ["desktop-theme"],
+    queryFn: () => window.sdvDesktop!.getTheme(),
+    enabled: desktop,
+  });
+  const theme = desktopThemeQuery.data ?? localTheme;
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
     const updateSystemTheme = () => {
-      if (getTheme() === "system") {
+      if (theme === "system") {
         applyResolvedTheme(resolveTheme("system"));
       }
     };
 
-    const selectedTheme = getTheme();
-    void window.sdvDesktop
-      ?.setTheme(selectedTheme)
-      .then(() => applyResolvedTheme(resolveTheme(selectedTheme)));
+    applyResolvedTheme(resolveTheme(theme));
     media.addEventListener("change", updateSystemTheme);
     return () => media.removeEventListener("change", updateSystemTheme);
-  }, []);
+  }, [theme]);
+
+  async function selectTheme(nextTheme: Theme) {
+    await applyTheme(nextTheme);
+    if (desktop) {
+      queryClient.setQueryData(["desktop-theme"], nextTheme);
+    }
+  }
 
   const themes: Theme[] = ["system", "light", "dark"];
 
@@ -88,7 +117,7 @@ export function ThemeSwitcher() {
           size="sm"
           variant="ghost"
           aria-pressed={theme === option}
-          onClick={() => void applyTheme(option)}
+          onClick={() => void selectTheme(option)}
           className={
             theme === option
               ? "bg-background text-foreground shadow-xs hover:bg-background"
