@@ -4,6 +4,7 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("sdvDesktop", {
   isDesktop: true,
+  platform: process.platform,
   getCurrentRepository: () => ipcRenderer.invoke("sdv:get-current-repository"),
   getRecentRepositories: () => ipcRenderer.invoke("sdv:get-recent-repositories"),
   forgetRepository: (directory) =>
@@ -12,4 +13,10 @@ contextBridge.exposeInMainWorld("sdvDesktop", {
   openRecentRepository: (directory) =>
     ipcRenderer.invoke("sdv:open-recent-repository", directory),
   setTheme: (theme) => ipcRenderer.invoke("sdv:set-theme", theme),
+  getWindowControls: () => ipcRenderer.invoke("sdv:get-window-controls"),
+  setWindowControls: (mode) =>
+    ipcRenderer.invoke("sdv:set-window-controls", mode),
+  windowAction: (action) => ipcRenderer.invoke("sdv:window-action", action),
+  showMenu: (menu, position) =>
+    ipcRenderer.invoke("sdv:show-menu", menu, position),
 });

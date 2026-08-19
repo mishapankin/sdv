@@ -1,5 +1,6 @@
 :root {
   color-scheme: light;
+  --desktop-titlebar-height: 0px;
   --background: #f8f9fa;
   --foreground: #20242a;
   --card: #ffffff;
@@ -29,6 +30,108 @@ body {
   margin: 0;
 }
 
+.desktop-menu-bar {
+  position: relative;
+  z-index: 10;
+  height: var(--desktop-titlebar-height);
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+  color: var(--foreground);
+  app-region: drag;
+  user-select: none;
+}
+
+.desktop-menu-bar[hidden] {
+  display: none;
+}
+
+.desktop-menu-bar__content {
+  position: relative;
+  width: env(titlebar-area-width, 100%);
+  height: 100%;
+  margin-left: env(titlebar-area-x, 0);
+}
+
+.desktop-menu-bar__menus {
+  height: 100%;
+  padding: 0 6px;
+  display: flex;
+  align-items: center;
+}
+
+.desktop-menu-bar button {
+  position: relative;
+  z-index: 1;
+  height: 24px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--foreground);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  app-region: no-drag;
+}
+
+.desktop-window-controls {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  height: 100%;
+  display: flex;
+  app-region: no-drag;
+}
+
+.desktop-window-controls--left {
+  left: 0;
+}
+
+.desktop-window-controls--right {
+  right: 0;
+}
+
+.desktop-menu-bar__menus--controls-left {
+  margin-left: 138px;
+}
+
+.desktop-window-controls button {
+  width: 46px;
+  height: 100%;
+  padding: 0;
+  border-radius: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "Segoe UI Symbol", sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.desktop-window-controls button.desktop-window-controls__close:hover,
+.desktop-window-controls button.desktop-window-controls__close:focus-visible {
+  background: #c42b1c;
+  color: white;
+}
+
+.desktop-menu-bar button:hover,
+.desktop-menu-bar button:focus-visible {
+  background: var(--muted);
+  color: var(--foreground);
+}
+
+.desktop-menu-bar__title {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
 body {
   overflow: hidden;
   background: var(--background);
@@ -45,11 +148,27 @@ button:focus-visible {
 }
 
 .app-shell {
-  height: 100vh;
+  height: calc(100vh - var(--desktop-titlebar-height));
   min-height: 520px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --background: #171a1f;
+    --foreground: #f4f4f5;
+    --card: #202329;
+    --muted: #292d34;
+    --muted-foreground: #a3a8b0;
+    --border: #343942;
+    --input: #343942;
+    --ring: #737982;
+    --success: #45bd70;
+    --destructive: #ed6a70;
+  }
 }
 
 .open-button {

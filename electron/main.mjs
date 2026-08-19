@@ -30,6 +30,11 @@ import {
   rememberRecentRepository,
   serializeRecentRepositories,
 } from "./recent-repositories.mjs";
+import {
+  getDefaultWindowControls,
+  parseWindowControls,
+  WINDOW_CONTROL_MODES,
+} from "./window-controls.mjs";
 import { DESKTOP_TOKEN_HEADER } from "../runtime/constants.mjs";
 import { preflightWorkspace } from "../runtime/preflight.mjs";
 import {
@@ -48,6 +53,8 @@ const preloadPath = path.join(packageRoot, "electron", "preload.cjs");
 const launcherPath = path.join(packageRoot, "electron", "launcher.html");
 const launcherUrl = pathToFileURL(launcherPath).href;
 const LOOPBACK_HOST = "127.0.0.1";
+const CUSTOM_TITLE_BAR_HEIGHT = 32;
+const CUSTOM_MENU_IDS = new Set(["file", "view", "window"]);
 
 let mainWindow;
 let activeServer;
@@ -56,6 +63,7 @@ let activeRepository;
 let initializing = true;
 let pendingWorkspace;
 let quitting = false;
+let windowControlsMode = getDefaultWindowControls(process.platform);
 const enqueueWorkspaceOperation = createOperationQueue();
 
 const requestedWorkspace = getRequestedWorkspace(process.argv);
@@ -69,6 +77,39 @@ if (!hasSingleInstanceLock) {
 
 function getRecentRepositoriesPath() {
   return path.join(app.getPath("userData"), "recent-repositories.json");
+}
+
+function getDesktopPreferencesPath() {
+  return path.join(app.getPath("userData"), "preferences.json");
+}
+
+async function readWindowControlsPreference() {
+  try {
+    const contents = await readFile(getDesktopPreferencesPath(), "utf8");
+    const preferences = JSON.parse(contents);
+    return parseWindowControls(preferences?.windowControls, process.platform);
+  } catch {
+    return getDefaultWindowControls(process.platform);
+  }
+}
+
+async function writeWindowControlsPreference(mode) {
+  const destination = getDesktopPreferencesPath();
+  const temporaryPath = `${destination}.${process.pid}-${randomBytes(6).toString("hex")}.tmp`;
+
+  await mkdir(path.dirname(destination), { recursive: true });
+
+  try {
+    await writeFile(
+      temporaryPath,
+      `${JSON.stringify({ windowControls: mode }, null, 2)}\n`,
+      "utf8",
+    );
+    await rename(temporaryPath, destination);
+  } catch (error) {
+    await rm(temporaryPath, { force: true });
+    throw error;
+  }
 }
 
 async function readRecentRepositories() {
@@ -258,15 +299,19 @@ function isTrustedSender(event) {
   }
 }
 
-function createWindow() {
+function createWindow(bounds) {
+  const useCustomControls =
+    process.platform !== "darwin" && windowControlsMode !== "native";
   const window = new BrowserWindow({
     title: "SDV",
     width: 1440,
     height: 900,
     minWidth: 960,
     minHeight: 600,
+    ...(bounds || {}),
     show: false,
     backgroundColor: "#181a1f",
+    ...(useCustomControls ? { frame: false } : {}),
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -275,9 +320,16 @@ function createWindow() {
     },
   });
 
+  if (process.platform !== "darwin") {
+    window.setMenuBarVisibility(false);
+  }
+
   window.once("ready-to-show", () => window.show());
   window.webContents.setWindowOpenHandler(({ url }) => {
-    if (url === "https://github.com/ataraxy-labs/sem") {
+    if (
+      url === "https://github.com/ataraxy-labs/sem" ||
+      url === "https://github.com/Ataraxy-Labs/inspect"
+    ) {
       void shell.openExternal(url);
     }
 
@@ -293,6 +345,37 @@ function createWindow() {
   });
 
   return window;
+}
+
+async function recreateMainWindow() {
+  const previousWindow = mainWindow;
+  const previousUrl = previousWindow?.webContents.getURL();
+  const bounds = previousWindow?.getBounds();
+  const wasMaximized = previousWindow?.isMaximized();
+  const wasFullScreen = previousWindow?.isFullScreen();
+  const nextWindow = createWindow(bounds);
+
+  mainWindow = nextWindow;
+
+  try {
+    if (activeServer) {
+      const targetUrl =
+        previousUrl && new URL(previousUrl).origin === activeOrigin
+          ? previousUrl
+          : activeServer.url;
+      await nextWindow.loadURL(targetUrl);
+    } else {
+      await nextWindow.loadFile(launcherPath);
+    }
+  } catch (error) {
+    mainWindow = previousWindow;
+    nextWindow.destroy();
+    throw error;
+  }
+
+  if (wasMaximized) nextWindow.maximize();
+  if (wasFullScreen) nextWindow.setFullScreen(true);
+  previousWindow?.destroy();
 }
 
 async function openWorkspace(directory) {
@@ -388,11 +471,92 @@ function installIpcHandlers() {
     if (!isTrustedSender(event)) {
       throw new Error("untrusted IPC sender");
     }
-    if (theme !== "light" && theme !== "dark") {
+    if (theme !== "system" && theme !== "light" && theme !== "dark") {
       throw new Error("invalid theme");
     }
 
     nativeTheme.themeSource = theme;
+  });
+
+  ipcMain.handle("sdv:get-window-controls", (event) => {
+    if (!isTrustedSender(event)) {
+      throw new Error("untrusted IPC sender");
+    }
+
+    return {
+      mode: windowControlsMode,
+      defaultMode: getDefaultWindowControls(process.platform),
+      platform: process.platform,
+    };
+  });
+
+  ipcMain.handle("sdv:set-window-controls", async (event, mode) => {
+    if (!isTrustedSender(event)) {
+      throw new Error("untrusted IPC sender");
+    }
+    if (
+      process.platform === "darwin" ||
+      !WINDOW_CONTROL_MODES.has(mode)
+    ) {
+      throw new Error("invalid window controls mode");
+    }
+
+    await writeWindowControlsPreference(mode);
+
+    if (windowControlsMode !== mode) {
+      windowControlsMode = mode;
+      setTimeout(() => {
+        void recreateMainWindow().catch((error) => {
+          console.error(`sdv: unable to apply window controls: ${error.message}`);
+        });
+      }, 0);
+    }
+  });
+
+  ipcMain.handle("sdv:window-action", (event, action) => {
+    if (!isTrustedSender(event)) {
+      throw new Error("untrusted IPC sender");
+    }
+    if (!mainWindow || !["minimize", "maximize", "close"].includes(action)) {
+      throw new Error("invalid window action");
+    }
+
+    if (action === "minimize") mainWindow.minimize();
+    if (action === "maximize") {
+      if (mainWindow.isMaximized()) mainWindow.unmaximize();
+      else mainWindow.maximize();
+    }
+    if (action === "close") mainWindow.close();
+  });
+
+  ipcMain.handle("sdv:show-menu", (event, menuId, position) => {
+    if (!isTrustedSender(event)) {
+      throw new Error("untrusted IPC sender");
+    }
+    if (
+      process.platform === "darwin" ||
+      !CUSTOM_MENU_IDS.has(menuId) ||
+      typeof position !== "object" ||
+      position === null ||
+      !Number.isFinite(position.x) ||
+      !Number.isFinite(position.y)
+    ) {
+      throw new Error("invalid menu request");
+    }
+
+    const menuItem = Menu.getApplicationMenu()?.getMenuItemById(
+      `menu-${menuId}`,
+    );
+
+    if (!mainWindow || !menuItem?.submenu) {
+      throw new Error("menu is unavailable");
+    }
+
+    menuItem.submenu.popup({
+      window: mainWindow,
+      x: Math.max(0, Math.round(position.x)),
+      y: Math.max(CUSTOM_TITLE_BAR_HEIGHT, Math.round(position.y)),
+    });
   });
 
   ipcMain.handle("sdv:get-current-repository", (event) => {
@@ -468,6 +632,7 @@ function installApplicationMenu() {
         ]
       : []),
     {
+      id: "menu-file",
       label: "File",
       submenu: [
         {
@@ -487,6 +652,7 @@ function installApplicationMenu() {
       ],
     },
     {
+      id: "menu-view",
       label: "View",
       submenu: [
         { role: "reload" },
@@ -501,6 +667,7 @@ function installApplicationMenu() {
       ],
     },
     {
+      id: "menu-window",
       label: "Window",
       submenu: [{ role: "minimize" }, { role: "zoom" }],
     },
@@ -536,6 +703,7 @@ if (hasSingleInstanceLock) {
   app
     .whenReady()
     .then(async () => {
+      windowControlsMode = await readWindowControlsPreference();
       installSessionGuards();
       installIpcHandlers();
       installApplicationMenu();

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 
+import { DesktopMenuBar } from "@/components/desktop-menu-bar";
 import { QueryProvider } from "@/components/query-provider";
 import { readDefaultRepositoryName } from "@/lib/workspace";
 
@@ -54,12 +55,15 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html:
-              '(function(){try{var t=localStorage.getItem("sdv-theme");if(!t)t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.classList.toggle("dark",t==="dark")}catch(e){}})()',
+              '(function(){try{var t=localStorage.getItem("sdv-theme");var d=t==="dark"||(t!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.classList.toggle("dark",d)}catch(e){}})()',
           }}
         />
       </head>
       <body className="min-h-full">
-        <QueryProvider>{children}</QueryProvider>
+        <QueryProvider>
+          <DesktopMenuBar />
+          {children}
+        </QueryProvider>
       </body>
     </html>
   );

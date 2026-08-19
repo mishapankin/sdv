@@ -1,22 +1,20 @@
 "use client";
 
-import { Moon, Sun } from "lucide-react";
 import { useEffect, useSyncExternalStore } from "react";
 
 import { Button } from "@/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 
-type Theme = "light" | "dark";
+type Theme = "system" | "light" | "dark";
 
 const THEME_EVENT = "sdv-theme-change";
 const THEME_STORAGE_KEY = "sdv-theme";
 
 function getTheme(): Theme {
-  return document.documentElement.classList.contains("dark") ? "dark" : "light";
+  const storedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+
+  return storedTheme === "light" || storedTheme === "dark"
+    ? storedTheme
+    : "system";
 }
 
 function subscribe(onChange: () => void) {
@@ -25,47 +23,81 @@ function subscribe(onChange: () => void) {
 }
 
 function getServerTheme(): Theme {
-  return "light";
+  return "system";
 }
 
 export function useTheme() {
   return useSyncExternalStore<Theme>(subscribe, getTheme, getServerTheme);
 }
 
-export function ThemeToggle() {
+function resolveTheme(theme: Theme): "light" | "dark" {
+  if (theme !== "system") return theme;
+
+  return window.matchMedia("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : "light";
+}
+
+function applyResolvedTheme(theme: "light" | "dark") {
+  const root = document.documentElement;
+
+  root.classList.add("theme-switching");
+  root.classList.toggle("dark", theme === "dark");
+  requestAnimationFrame(() => root.classList.remove("theme-switching"));
+}
+
+async function applyTheme(theme: Theme) {
+  localStorage.setItem(THEME_STORAGE_KEY, theme);
+  window.dispatchEvent(new Event(THEME_EVENT));
+
+  await window.sdvDesktop?.setTheme(theme);
+  applyResolvedTheme(resolveTheme(theme));
+}
+
+export function ThemeSwitcher() {
   const theme = useTheme();
 
   useEffect(() => {
-    void window.sdvDesktop?.setTheme(getTheme());
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const updateSystemTheme = () => {
+      if (getTheme() === "system") {
+        applyResolvedTheme(resolveTheme("system"));
+      }
+    };
+
+    const selectedTheme = getTheme();
+    void window.sdvDesktop
+      ?.setTheme(selectedTheme)
+      .then(() => applyResolvedTheme(resolveTheme(selectedTheme)));
+    media.addEventListener("change", updateSystemTheme);
+    return () => media.removeEventListener("change", updateSystemTheme);
   }, []);
 
-  function toggleTheme() {
-    const nextTheme: Theme = theme === "dark" ? "light" : "dark";
-    const root = document.documentElement;
-
-    root.classList.add("theme-switching");
-    root.classList.toggle("dark", nextTheme === "dark");
-    localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
-    void window.sdvDesktop?.setTheme(nextTheme);
-    window.dispatchEvent(new Event(THEME_EVENT));
-    requestAnimationFrame(() => root.classList.remove("theme-switching"));
-  }
+  const themes: Theme[] = ["system", "light", "dark"];
 
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
+    <div
+      role="group"
+      aria-label="Color theme"
+      className="inline-flex items-center rounded-lg border bg-muted/30 p-0.5"
+    >
+      {themes.map((option) => (
         <Button
-          size="icon"
-          variant="outline"
-          aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
-          onClick={toggleTheme}
+          key={option}
+          type="button"
+          size="sm"
+          variant="ghost"
+          aria-pressed={theme === option}
+          onClick={() => void applyTheme(option)}
+          className={
+            theme === option
+              ? "bg-background text-foreground shadow-xs hover:bg-background"
+              : "text-muted-foreground shadow-none"
+          }
         >
-          {theme === "dark" ? <Sun /> : <Moon />}
+          {option[0].toUpperCase() + option.slice(1)}
         </Button>
-      </TooltipTrigger>
-      <TooltipContent>
-        Switch to {theme === "dark" ? "light" : "dark"} theme
-      </TooltipContent>
-    </Tooltip>
+      ))}
+    </div>
   );
 }

@@ -1,5 +1,56 @@
 const workspaceList = document.querySelector("#workspace-list");
 const openWorkspaceButton = document.querySelector("#open-workspace");
+const desktopMenuBar = document.querySelector("#desktop-menu-bar");
+const desktopWindowControls = document.querySelector(
+  "#desktop-window-controls",
+);
+
+function renderWindowControls(mode) {
+  if (mode !== "left" && mode !== "right") return;
+
+  desktopWindowControls.classList.add(`desktop-window-controls--${mode}`);
+  if (mode === "left") {
+    desktopMenuBar
+      .querySelector(".desktop-menu-bar__menus")
+      .classList.add("desktop-menu-bar__menus--controls-left");
+  }
+
+  [
+    ["minimize", "Minimize window", "−"],
+    ["maximize", "Maximize or restore window", "□"],
+    ["close", "Close window", "×"],
+  ].forEach(([action, label, symbol]) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `desktop-window-controls__${action}`;
+    button.setAttribute("aria-label", label);
+    button.textContent = symbol;
+    button.addEventListener("click", () => {
+      void window.sdvDesktop.windowAction(action);
+    });
+    desktopWindowControls.append(button);
+  });
+}
+
+if (window.sdvDesktop && window.sdvDesktop.platform !== "darwin") {
+  document.documentElement.style.setProperty(
+    "--desktop-titlebar-height",
+    "32px",
+  );
+  desktopMenuBar.hidden = false;
+  void window.sdvDesktop
+    .getWindowControls()
+    .then(({ mode }) => renderWindowControls(mode));
+  desktopMenuBar.querySelectorAll("[data-menu]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const bounds = button.getBoundingClientRect();
+      void window.sdvDesktop.showMenu(button.dataset.menu, {
+        x: bounds.left,
+        y: bounds.bottom,
+      });
+    });
+  });
+}
 
 function formatLastOpened(value) {
   if (!value) return "Previously opened";

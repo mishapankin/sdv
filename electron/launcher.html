@@ -12,6 +12,23 @@
     <script src="./launcher.js" defer></script>
   </head>
   <body>
+    <header
+      class="desktop-menu-bar"
+      id="desktop-menu-bar"
+      role="menubar"
+      aria-label="Application menu"
+      hidden
+    >
+      <div class="desktop-menu-bar__content">
+        <div class="desktop-window-controls" id="desktop-window-controls"></div>
+        <div class="desktop-menu-bar__menus">
+          <button type="button" role="menuitem" aria-haspopup="menu" data-menu="file" accesskey="f">File</button>
+          <button type="button" role="menuitem" aria-haspopup="menu" data-menu="view" accesskey="v">View</button>
+          <button type="button" role="menuitem" aria-haspopup="menu" data-menu="window" accesskey="w">Window</button>
+        </div>
+        <div class="desktop-menu-bar__title">SDV</div>
+      </div>
+    </header>
     <div class="app-shell">
       <main class="launcher-main">
         <section class="workspace-section" aria-labelledby="recent-heading">

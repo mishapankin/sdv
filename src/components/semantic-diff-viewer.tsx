@@ -13,7 +13,9 @@ import {
   GitMerge,
   Minus,
   RefreshCw,
+  Settings,
 } from "lucide-react";
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePanelRef } from "react-resizable-panels";
 
@@ -37,7 +39,6 @@ import {
 import { ImageDiffView } from "@/components/image-diff-view";
 import { LayoutControls } from "@/components/layout-controls";
 import { RepositoryRail } from "@/components/repository-rail";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import {
   ResizableHandle,
@@ -330,7 +331,7 @@ export function SemanticDiffViewer() {
       highlighterOptions={DIFF_HIGHLIGHTER_OPTIONS}
     >
       <TooltipProvider>
-        <div className="flex h-dvh min-h-[520px] flex-col overflow-hidden bg-background">
+        <div className="flex h-[calc(100dvh-var(--desktop-titlebar-height))] min-h-[520px] flex-col overflow-hidden bg-background">
         <header className="flex h-14 shrink-0 items-center gap-4 overflow-x-auto border-b bg-card px-4">
           {diff ? (
             <div className="hidden min-w-0 shrink-0 items-center gap-2 text-xs text-muted-foreground sm:flex">
@@ -428,7 +429,16 @@ export function SemanticDiffViewer() {
               </TooltipTrigger>
               <TooltipContent>Refresh diff</TooltipContent>
             </Tooltip>
-            <ThemeToggle />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button size="icon" variant="outline" asChild>
+                  <Link href="/settings" aria-label="Open settings">
+                    <Settings />
+                  </Link>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Settings</TooltipContent>
+            </Tooltip>
           </div>
         </header>
 
