@@ -14,7 +14,6 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
 
-import { changeStyles } from "@/components/change-badge";
 import { DiffCodeView } from "@/components/diff-code-view";
 import {
   HunkNavigation,
@@ -23,7 +22,6 @@ import {
 } from "@/components/diff-navigation";
 import { EntityIcon } from "@/components/entity-icons";
 import { RiskMeter } from "@/components/risk-badge";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -34,7 +32,6 @@ import type { DiffLineTarget } from "@/lib/diff-selection";
 import { formatInspectClassification } from "@/lib/inspect-view-model";
 import type { InspectEntityReview } from "@/lib/inspect-types";
 import type { SemanticChange } from "@/lib/sem-types";
-import { cn } from "@/lib/utils";
 
 function createEntityFileDiff(
   change: SemanticChange,
@@ -81,7 +78,6 @@ export function EntityDiffView({
   onNextEntity?: () => void;
   onViewInContext: (target?: DiffLineTarget) => void;
 }) {
-  const status = changeStyles[change.changeType];
   const fileDiff = useMemo(
     () => createEntityFileDiff(change, renderVersion),
     [change, renderVersion],
@@ -150,7 +146,7 @@ export function EntityDiffView({
                   <span
                     tabIndex={0}
                     aria-label={`${change.entityType} entity`}
-                    className="shrink-0 cursor-help rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                    className="shrink-0 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
                   >
                     <EntityIcon
                       entityType={change.entityType}
@@ -165,15 +161,6 @@ export function EntityDiffView({
               <h1 className="truncate text-lg font-semibold tracking-tight">
                 {change.entityName || "(anonymous)"}
               </h1>
-              <Badge
-                variant="outline"
-                className={cn(
-                  "rounded-md text-[10px] uppercase",
-                  status.className,
-                )}
-              >
-                {status.label}
-              </Badge>
             </div>
             <div className="mt-1.5 flex items-center gap-2 truncate font-mono text-xs text-muted-foreground">
               {change.oldFilePath && change.oldFilePath !== change.filePath ? (
