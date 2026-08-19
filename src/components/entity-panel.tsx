@@ -136,41 +136,43 @@ export function EntityPanel({
 
             return (
               <button
-              key={change.entityId}
-              type="button"
-              onClick={() => onSelectEntity(change.entityId)}
-              aria-current={
-                selectedEntityId === change.entityId ? "page" : undefined
-              }
-              className={cn(
-                "relative mx-2 flex h-11 w-[calc(100%_-_1rem)] items-center gap-2 rounded-md px-2.5 text-left transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50",
-                selectedEntityId === change.entityId &&
-                  selectedRowClass,
-              )}
-              title={`${change.entityType}: ${change.entityName || "(anonymous)"}`}
-            >
-              <EntityIcon
-                entityType={change.entityType}
+                key={change.entityId}
+                type="button"
+                onClick={() => onSelectEntity(change.entityId)}
+                aria-current={
+                  selectedEntityId === change.entityId ? "page" : undefined
+                }
                 className={cn(
-                  "size-4 shrink-0 text-muted-foreground",
+                  "relative ml-2 grid h-11 w-[calc(100%_-_0.5rem)] grid-cols-[1rem_minmax(0,1fr)_3.75rem] items-center gap-x-2 overflow-hidden rounded-l-md rounded-r-none pr-3 pl-2.5 text-left transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50",
                   selectedEntityId === change.entityId &&
-                    "text-sky-700 dark:text-sky-300",
+                    selectedRowClass,
                 )}
-              />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-xs font-medium">
-                  {change.entityName || "(anonymous)"}
+                title={`${change.entityType}: ${change.entityName || "(anonymous)"}`}
+              >
+                <EntityIcon
+                  entityType={change.entityType}
+                  className={cn(
+                    "size-4 shrink-0 text-muted-foreground",
+                    selectedEntityId === change.entityId &&
+                      "text-sky-700 dark:text-sky-300",
+                  )}
+                />
+                <span className="min-w-0 overflow-hidden">
+                  <span className="block truncate text-xs font-medium">
+                    {change.entityName || "(anonymous)"}
+                  </span>
+                  <span className="block truncate font-mono text-[9px] leading-3 text-muted-foreground">
+                    {change.entityType}
+                    {review
+                      ? ` · ${formatInspectClassification(review.classification)}`
+                      : ""}
+                    {change.startLine ? ` · L${change.startLine}` : ""}
+                  </span>
                 </span>
-                <span className="block truncate font-mono text-[9px] leading-3 text-muted-foreground">
-                  {change.entityType}
-                  {review
-                    ? ` · ${formatInspectClassification(review.classification)}`
-                    : ""}
-                  {change.startLine ? ` · L${change.startLine}` : ""}
+                <span className="flex w-[3.75rem] items-center justify-end gap-2">
+                  {review ? <RiskBadge review={review} /> : null}
+                  <ChangeBadge changeType={change.changeType} />
                 </span>
-              </span>
-              {review ? <RiskBadge review={review} /> : null}
-              <ChangeBadge changeType={change.changeType} />
               </button>
             );
           })}

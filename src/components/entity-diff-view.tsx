@@ -22,9 +22,14 @@ import {
   useHunkNavigation,
 } from "@/components/diff-navigation";
 import { EntityIcon } from "@/components/entity-icons";
-import { RiskBadge } from "@/components/risk-badge";
+import { RiskMeter } from "@/components/risk-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { DiffLineTarget } from "@/lib/diff-selection";
 import { formatInspectClassification } from "@/lib/inspect-view-model";
 import type { InspectEntityReview } from "@/lib/inspect-types";
@@ -140,19 +145,26 @@ export function EntityDiffView({
         <div className="flex min-h-20 items-center justify-between gap-4 px-6 py-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2.5">
-              <EntityIcon
-                entityType={change.entityType}
-                className="size-5 text-foreground"
-              />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span
+                    tabIndex={0}
+                    aria-label={`${change.entityType} entity`}
+                    className="shrink-0 cursor-help rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                  >
+                    <EntityIcon
+                      entityType={change.entityType}
+                      className="size-5 text-foreground"
+                    />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent className="font-mono uppercase">
+                  {change.entityType.toUpperCase()}
+                </TooltipContent>
+              </Tooltip>
               <h1 className="truncate text-lg font-semibold tracking-tight">
                 {change.entityName || "(anonymous)"}
               </h1>
-              <Badge
-                variant="outline"
-                className="rounded-md font-mono text-[10px] tracking-wide uppercase"
-              >
-                {change.entityType}
-              </Badge>
               <Badge
                 variant="outline"
                 className={cn(
@@ -162,9 +174,6 @@ export function EntityDiffView({
               >
                 {status.label}
               </Badge>
-              {inspectReview ? (
-                <RiskBadge review={inspectReview} />
-              ) : null}
             </div>
             <div className="mt-1.5 flex items-center gap-2 truncate font-mono text-xs text-muted-foreground">
               {change.oldFilePath && change.oldFilePath !== change.filePath ? (
@@ -218,42 +227,47 @@ export function EntityDiffView({
             className="flex h-8 items-center gap-4 overflow-hidden border-t bg-muted/25 px-6 font-mono text-[10px] text-muted-foreground"
             aria-label={`Inspect analysis: ${inspectReview.riskLevel} risk, score ${inspectReview.riskScore.toFixed(2)}`}
           >
-            <span className="shrink-0 font-semibold text-foreground uppercase">
-              {formatInspectClassification(inspectReview.classification)}
-            </span>
-            <span className="flex shrink-0 items-center gap-1.5">
-              <Network className="size-3" aria-hidden="true" />
-              blast{" "}
-              <strong className="text-foreground">
-                {inspectReview.blastRadius}
-              </strong>
-            </span>
-            <span className="shrink-0">
-              <strong className="text-foreground">
-                {inspectReview.dependentCount}
-              </strong>{" "}
-              dependent{inspectReview.dependentCount === 1 ? "" : "s"}
-            </span>
-            <span className="hidden shrink-0 xl:inline">
-              <strong className="text-foreground">
-                {inspectReview.dependencyCount}
-              </strong>{" "}
-              dependencies
-            </span>
-            {inspectReview.publicApi ? (
-              <span className="flex shrink-0 items-center gap-1.5 font-semibold text-orange-700 uppercase dark:text-orange-300">
-                <ShieldCheck className="size-3" aria-hidden="true" />
-                public API
+            <span className="flex min-w-0 items-center gap-4 overflow-hidden">
+              <span className="shrink-0 font-semibold text-foreground uppercase">
+                {formatInspectClassification(inspectReview.classification)}
               </span>
-            ) : null}
-            {inspectReview.groupLabel ? (
-              <span className="hidden shrink-0 truncate xl:inline">
-                group{" "}
+              <span className="flex shrink-0 items-center gap-1.5">
+                <Network className="size-3" aria-hidden="true" />
+                blast{" "}
                 <strong className="text-foreground">
-                  {inspectReview.groupLabel}
+                  {inspectReview.blastRadius}
                 </strong>
               </span>
-            ) : null}
+              <span className="shrink-0">
+                <strong className="text-foreground">
+                  {inspectReview.dependentCount}
+                </strong>{" "}
+                dependent{inspectReview.dependentCount === 1 ? "" : "s"}
+              </span>
+              <span className="hidden shrink-0 xl:inline">
+                <strong className="text-foreground">
+                  {inspectReview.dependencyCount}
+                </strong>{" "}
+                dependencies
+              </span>
+              {inspectReview.groupLabel ? (
+                <span className="hidden shrink-0 truncate xl:inline">
+                  group{" "}
+                  <strong className="text-foreground">
+                    {inspectReview.groupLabel}
+                  </strong>
+                </span>
+              ) : null}
+            </span>
+            <span className="ml-auto flex shrink-0 items-center gap-4">
+              {inspectReview.publicApi ? (
+                <span className="flex shrink-0 items-center gap-1.5 font-semibold text-orange-700 uppercase dark:text-orange-300">
+                  <ShieldCheck className="size-3" aria-hidden="true" />
+                  public API
+                </span>
+              ) : null}
+              <RiskMeter riskLevel={inspectReview.riskLevel} />
+            </span>
           </div>
         ) : null}
       </header>

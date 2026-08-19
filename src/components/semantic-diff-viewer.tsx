@@ -490,7 +490,6 @@ export function SemanticDiffViewer() {
                       <DiffSidebar
                         changes={visibleChanges}
                         fileChanges={visibleFileChanges}
-                        inspectReviews={inspectReviews}
                         selectedFilePath={effectiveSelectedFilePath}
                         onSelectFile={selectFile}
                       />
@@ -588,7 +587,7 @@ export function SemanticDiffViewer() {
                         <ResizablePanel
                           panelRef={rightSidebarRef}
                           defaultSize={
-                            rightSidebarExpanded ? "240px" : "0px"
+                            rightSidebarExpanded ? "280px" : "0px"
                           }
                           minSize="190px"
                           maxSize="360px"
