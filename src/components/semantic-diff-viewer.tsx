@@ -14,7 +14,7 @@ import {
   Minus,
   RefreshCw,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePanelRef } from "react-resizable-panels";
 
 import {
@@ -35,6 +35,7 @@ import {
   FileDiffView,
 } from "@/components/file-diff-view";
 import { ImageDiffView } from "@/components/image-diff-view";
+import { LayoutControls } from "@/components/layout-controls";
 import { RepositoryRail } from "@/components/repository-rail";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -71,12 +72,15 @@ import {
   removeFileDiffQueries,
 } from "@/lib/diff-query";
 import { groupByFile, hasFileInDiff } from "@/lib/group-changes";
+import { indexInspectReviews } from "@/lib/inspect-view-model";
+import type { InspectEntityReview } from "@/lib/inspect-types";
 import { mergeModuleLevelChanges } from "@/lib/merge-module-changes";
 import { shouldShowSemanticSidebar } from "@/lib/semantic-sidebar";
 import type { FileOnlyChange } from "@/lib/sem-types";
 import { cn } from "@/lib/utils";
 
 const EMPTY_FILE_CHANGES: FileOnlyChange[] = [];
+const EMPTY_INSPECT_REVIEWS: InspectEntityReview[] = [];
 const DIFF_WORKER_POOL_OPTIONS = {
   poolSize: 2,
   workerFactory: () =>
@@ -94,6 +98,28 @@ export function SemanticDiffViewer() {
   const leftSidebarRef = usePanelRef();
   const rightSidebarRef = usePanelRef();
   const [selection, setSelection] = useState<DiffSelection | null>(null);
+  const [leftSidebarExpanded, setLeftSidebarExpanded] = useState(true);
+  const [rightSidebarExpanded, setRightSidebarExpanded] = useState(true);
+  const toggleLeftSidebar = useCallback(() => {
+    const panel = leftSidebarRef.current;
+
+    if (!panel) return;
+    if (panel.isCollapsed()) {
+      panel.expand();
+    } else {
+      panel.collapse();
+    }
+  }, [leftSidebarRef]);
+  const toggleRightSidebar = useCallback(() => {
+    const panel = rightSidebarRef.current;
+
+    if (!panel) return;
+    if (panel.isCollapsed()) {
+      panel.expand();
+    } else {
+      panel.collapse();
+    }
+  }, [rightSidebarRef]);
   const repositoriesQuery = useQuery({
     queryKey: ["workspace-repositories"],
     queryFn: getWorkspaceRepositories,
@@ -131,6 +157,14 @@ export function SemanticDiffViewer() {
   });
   const result = query.data;
   const diff = result?.ok ? result.data : undefined;
+  const inspectReviews =
+    diff?.inspectAnalysis.status === "ready"
+      ? diff.inspectAnalysis.entities
+      : EMPTY_INSPECT_REVIEWS;
+  const inspectReviewsByEntityId = useMemo(
+    () => indexInspectReviews(inspectReviews),
+    [inspectReviews],
+  );
 
   useEffect(() => {
     if (diff) {
@@ -150,26 +184,25 @@ export function SemanticDiffViewer() {
         return;
       }
 
-      const panel = event.altKey
-        ? rightSidebarRef.current
-        : leftSidebarRef.current;
-
-      if (!panel) {
-        return;
-      }
-
-      event.preventDefault();
-
-      if (panel.isCollapsed()) {
-        panel.expand();
+      if (event.altKey) {
+        if (!rightSidebarRef.current) return;
+        event.preventDefault();
+        toggleRightSidebar();
       } else {
-        panel.collapse();
+        if (!leftSidebarRef.current) return;
+        event.preventDefault();
+        toggleLeftSidebar();
       }
     }
 
     window.addEventListener("keydown", handleSidebarShortcut);
     return () => window.removeEventListener("keydown", handleSidebarShortcut);
-  }, [leftSidebarRef, rightSidebarRef]);
+  }, [
+    leftSidebarRef,
+    rightSidebarRef,
+    toggleLeftSidebar,
+    toggleRightSidebar,
+  ]);
 
   const visibleChanges = useMemo(
     () =>
@@ -370,6 +403,17 @@ export function SemanticDiffViewer() {
                   : "Merge matching module-level additions and deletions"}
               </TooltipContent>
             </Tooltip>
+            {diff && fileGroups.length > 0 && selectedFileGroup ? (
+              <LayoutControls
+                leftExpanded={leftSidebarExpanded}
+                rightExpanded={
+                  showSemanticSidebar && rightSidebarExpanded
+                }
+                rightAvailable={showSemanticSidebar}
+                onToggleLeft={toggleLeftSidebar}
+                onToggleRight={toggleRightSidebar}
+              />
+            ) : null}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -432,15 +476,21 @@ export function SemanticDiffViewer() {
                   <ResizablePanelGroup orientation="horizontal">
                     <ResizablePanel
                       panelRef={leftSidebarRef}
-                      defaultSize="24%"
+                      defaultSize={
+                        leftSidebarExpanded ? "24%" : "0px"
+                      }
                       minSize="220px"
                       maxSize="34%"
                       collapsible
                       collapsedSize="0px"
+                      onResize={({ inPixels }) =>
+                        setLeftSidebarExpanded(inPixels > 0)
+                      }
                     >
                       <DiffSidebar
                         changes={visibleChanges}
                         fileChanges={visibleFileChanges}
+                        inspectReviews={inspectReviews}
                         selectedFilePath={effectiveSelectedFilePath}
                         onSelectFile={selectFile}
                       />
@@ -500,6 +550,9 @@ export function SemanticDiffViewer() {
                         <EntityDiffView
                           key={`${selectedChange.entityId}:${diff.refreshedAt}`}
                           change={selectedChange}
+                          inspectReview={inspectReviewsByEntityId.get(
+                            selectedChange.entityId,
+                          )}
                           renderVersion={diff.refreshedAt}
                           onViewInContext={(target) =>
                             setSelection({
@@ -534,16 +587,22 @@ export function SemanticDiffViewer() {
                         <ResizableHandle />
                         <ResizablePanel
                           panelRef={rightSidebarRef}
-                          defaultSize="240px"
+                          defaultSize={
+                            rightSidebarExpanded ? "240px" : "0px"
+                          }
                           minSize="190px"
                           maxSize="360px"
                           groupResizeBehavior="preserve-pixel-size"
                           collapsible
                           collapsedSize="0px"
+                          onResize={({ inPixels }) =>
+                            setRightSidebarExpanded(inPixels > 0)
+                          }
                         >
                           {diff.semanticAvailable ? (
                             <EntityPanel
                               fileGroup={selectedFileGroup}
+                              inspectReviews={inspectReviews}
                               selectedEntityId={selectedEntityId}
                               onSelectFullFile={() =>
                                 selectFile(effectiveSelectedFilePath)

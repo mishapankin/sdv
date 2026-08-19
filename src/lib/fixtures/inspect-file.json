@@ -1,0 +1,41 @@
+{
+  "entity_reviews": [
+    {
+      "entity_id": "src/auth.ts::function::validateToken",
+      "entity_name": "validateToken",
+      "entity_type": "function",
+      "file_path": "src/auth.ts",
+      "change_type": "modified",
+      "classification": "SyntaxFunctional",
+      "risk_score": 0.65,
+      "risk_level": "High",
+      "blast_radius": 8,
+      "dependent_count": 3,
+      "dependency_count": 2,
+      "is_public_api": true,
+      "structural_change": true,
+      "group_id": 2,
+      "start_line": 12,
+      "end_line": 18,
+      "before_content": "function validateToken() {}",
+      "after_content": "function validateToken(token: string) {}",
+      "dependent_names": [],
+      "dependency_names": []
+    }
+  ],
+  "groups": [
+    {
+      "id": 2,
+      "label": "authentication",
+      "entity_ids": [
+        "src/auth.ts::function::validateToken"
+      ]
+    }
+  ],
+  "stats": {
+    "total_entities": 1
+  },
+  "timing": {
+    "total_ms": 4
+  }
+}

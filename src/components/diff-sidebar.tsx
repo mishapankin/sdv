@@ -6,16 +6,19 @@ import { FileTree } from "@/components/file-tree";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { groupByFile } from "@/lib/group-changes";
+import type { InspectEntityReview } from "@/lib/inspect-types";
 import type { FileOnlyChange, SemanticChange } from "@/lib/sem-types";
 
 export function DiffSidebar({
   changes,
   fileChanges,
+  inspectReviews,
   selectedFilePath,
   onSelectFile,
 }: {
   changes: SemanticChange[];
   fileChanges: FileOnlyChange[];
+  inspectReviews: InspectEntityReview[];
   selectedFilePath?: string;
   onSelectFile: (filePath: string) => void;
 }) {
@@ -43,6 +46,7 @@ export function DiffSidebar({
       <ScrollArea className="min-h-0 flex-1">
         <FileTree
           fileGroups={fileGroups}
+          inspectReviews={inspectReviews}
           selectedFilePath={selectedFilePath}
           onSelectFile={onSelectFile}
         />

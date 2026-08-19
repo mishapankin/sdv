@@ -5,9 +5,15 @@ import { FileCode2 } from "lucide-react";
 import { ChangeBadge } from "@/components/change-badge";
 import { EntityIcon } from "@/components/entity-icons";
 import { FileTypeIcon } from "@/components/file-type-icon";
+import { RiskBadge } from "@/components/risk-badge";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { FileGroup } from "@/lib/group-changes";
+import {
+  formatInspectClassification,
+  indexInspectReviews,
+} from "@/lib/inspect-view-model";
+import type { InspectEntityReview } from "@/lib/inspect-types";
 import { cn } from "@/lib/utils";
 
 export function SemanticUnavailablePanel() {
@@ -42,16 +48,19 @@ export function SemanticUnavailablePanel() {
 
 export function EntityPanel({
   fileGroup,
+  inspectReviews,
   selectedEntityId,
   onSelectFullFile,
   onSelectEntity,
 }: {
   fileGroup: FileGroup;
+  inspectReviews: InspectEntityReview[];
   selectedEntityId?: string;
   onSelectFullFile: () => void;
   onSelectEntity: (entityId: string) => void;
 }) {
   const fileName = fileGroup.filePath.split("/").at(-1) ?? fileGroup.filePath;
+  const reviewsByEntityId = indexInspectReviews(inspectReviews);
   const isFullFileSelected = selectedEntityId === undefined;
   const selectedRowClass =
     "bg-sky-500/10 text-foreground shadow-xs ring-1 ring-inset ring-sky-600/20 before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:rounded-full before:bg-sky-600 dark:bg-sky-400/10 dark:ring-sky-400/25 dark:before:bg-sky-400";
@@ -122,8 +131,11 @@ export function EntityPanel({
             </Badge>
           </div>
 
-          {fileGroup.changes.map((change) => (
-            <button
+          {fileGroup.changes.map((change) => {
+            const review = reviewsByEntityId.get(change.entityId);
+
+            return (
+              <button
               key={change.entityId}
               type="button"
               onClick={() => onSelectEntity(change.entityId)}
@@ -151,12 +163,17 @@ export function EntityPanel({
                 </span>
                 <span className="block truncate font-mono text-[9px] leading-3 text-muted-foreground">
                   {change.entityType}
+                  {review
+                    ? ` · ${formatInspectClassification(review.classification)}`
+                    : ""}
                   {change.startLine ? ` · L${change.startLine}` : ""}
                 </span>
               </span>
+              {review ? <RiskBadge review={review} /> : null}
               <ChangeBadge changeType={change.changeType} />
-            </button>
-          ))}
+              </button>
+            );
+          })}
         </nav>
 
         {fileGroup.changes.length === 0 ? (

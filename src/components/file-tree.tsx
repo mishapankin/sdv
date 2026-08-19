@@ -5,6 +5,7 @@ import { useMemo } from "react";
 
 import { ChangeBadge } from "@/components/change-badge";
 import { FileTypeIcon } from "@/components/file-type-icon";
+import { RiskBadge } from "@/components/risk-badge";
 import {
   Collapsible,
   CollapsibleContent,
@@ -17,6 +18,8 @@ import {
   type FileTreeNode,
 } from "@/lib/file-tree";
 import type { FileGroup } from "@/lib/group-changes";
+import { getHighestFileRiskReview } from "@/lib/inspect-view-model";
+import type { InspectEntityReview } from "@/lib/inspect-types";
 import { cn } from "@/lib/utils";
 
 const INDENT_PX = 14;
@@ -24,6 +27,7 @@ const ROOT_PADDING_PX = 8;
 
 type FileTreeProps = {
   fileGroups: FileGroup[];
+  inspectReviews: InspectEntityReview[];
   selectedFilePath?: string;
   onSelectFile: (filePath: string) => void;
 };
@@ -79,10 +83,12 @@ function FileNode({
   depth,
   selectedFilePath,
   onSelectFile,
+  inspectReviews,
 }: Omit<TreeNodeProps, "node"> & { node: FileTreeFile }) {
   const fileTitle = node.group.oldFilePath
     ? `${node.group.oldFilePath} → ${node.path}`
     : node.path;
+  const highestRisk = getHighestFileRiskReview(inspectReviews, node.path);
 
   return (
     <button
@@ -97,11 +103,12 @@ function FileNode({
       title={fileTitle}
     >
       <span className="size-5 shrink-0" aria-hidden="true" />
-      <span className="grid min-w-0 flex-1 grid-cols-[1rem_minmax(0,1fr)_1.25rem] items-center gap-x-1.5">
+      <span className="grid min-w-0 flex-1 grid-cols-[1rem_minmax(0,1fr)_2rem_1.25rem] items-center gap-x-1.5">
         <FileTypeIcon filePath={node.path} className="size-4 shrink-0" />
         <span className="min-w-0 truncate text-xs font-medium">
           {node.name}
         </span>
+        {highestRisk ? <RiskBadge review={highestRisk} /> : <span />}
         <ChangeBadge changeType={node.group.changeType} />
       </span>
     </button>

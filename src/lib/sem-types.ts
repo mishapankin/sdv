@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import type { InspectAnalysis } from "@/lib/inspect-types";
+
 export const comparisonSchema = z.discriminatedUnion("mode", [
   z.object({ mode: z.literal("changed") }),
   z.object({ mode: z.literal("staged") }),
@@ -98,6 +100,7 @@ export type SemanticDiffResult =
         repositoryName: string;
         branchName: string;
         semanticAvailable: boolean;
+        inspectAnalysis: InspectAnalysis;
         refreshedAt: string;
       };
     }

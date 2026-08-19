@@ -21,6 +21,7 @@ import {
   hasPreviewableImageExtension,
   MAX_IMAGE_PREVIEW_BYTES,
 } from "@/lib/image-preview";
+import { readOptionalInspectAnalysis } from "@/lib/inspect";
 import {
   type Comparison,
   type FileOnlyChange,
@@ -490,6 +491,16 @@ export async function readSemanticDiffFromRepository(
           binaryChanges: [],
           fileChanges: [],
         };
+    const inspectAnalysis = await readOptionalInspectAnalysis(
+      resolvedComparison,
+      semanticData.changes,
+      cwd,
+      execute,
+    );
+
+    if (inspectAnalysis.status === "failed") {
+      reportError(`inspect: ${inspectAnalysis.error}`);
+    }
 
     const binaryFilePaths = new Set(
       semanticData.binaryChanges.map((change) => change.filePath),
@@ -519,6 +530,7 @@ export async function readSemanticDiffFromRepository(
         repositoryName: path.basename(rootResult.stdout.trim()),
         branchName: branchResult.stdout.trim() || "detached HEAD",
         semanticAvailable: semanticResult.available,
+        inspectAnalysis,
         refreshedAt: new Date().toISOString(),
       },
     };

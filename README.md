@@ -14,6 +14,7 @@ server-side Git and `sem` integration.
 - macOS or Linux
 - Node.js 22.12+
 - Optional: `sem` available in `PATH` for semantic entity details
+- Optional: `inspect` available in `PATH` for entity risk and impact details
 - A Git worktree
 
 ## Run
@@ -50,6 +51,13 @@ sem diff HEAD --verbose --format json
 
 `sem` remains the source of truth for semantic entities. Git status/diff output
 is used for repository dirty state, untracked files, and full-file diffs.
+
+When [`inspect`](https://github.com/Ataraxy-Labs/inspect) is available, SDV
+adds its risk level, classification, blast radius, dependency counts, public API
+status, and logical group to matching semantic entities. Changed comparisons
+use `inspect file` for each changed semantic file; ref comparisons use
+`inspect diff`. Inspect currently has no staged-only command, so the Staged
+comparison remains available without Inspect enrichment.
 
 ## CLI options
 
