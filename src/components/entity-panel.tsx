@@ -5,7 +5,7 @@ import { FileCode2 } from "lucide-react";
 import { ChangeBadge } from "@/components/change-badge";
 import { EntityIcon } from "@/components/entity-icons";
 import { FileTypeIcon } from "@/components/file-type-icon";
-import { RiskBadge } from "@/components/risk-badge";
+import { RiskDots } from "@/components/risk-badge";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { FileGroup } from "@/lib/group-changes";
@@ -143,7 +143,7 @@ export function EntityPanel({
                   selectedEntityId === change.entityId ? "page" : undefined
                 }
                 className={cn(
-                  "relative ml-2 grid h-11 w-[calc(100%_-_0.5rem)] grid-cols-[1rem_minmax(0,1fr)_3.75rem] items-center gap-x-2 overflow-hidden rounded-l-md rounded-r-none pr-3 pl-2.5 text-left transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50",
+                  "relative ml-2 grid h-11 w-[calc(100%_-_0.5rem)] grid-cols-[1rem_minmax(0,1fr)_1.25rem] items-center gap-x-2 overflow-hidden rounded-l-md rounded-r-none pr-3 pl-2.5 text-left transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50",
                   selectedEntityId === change.entityId &&
                     selectedRowClass,
                 )}
@@ -158,8 +158,13 @@ export function EntityPanel({
                   )}
                 />
                 <span className="min-w-0 overflow-hidden">
-                  <span className="block truncate text-xs font-medium">
-                    {change.entityName || "(anonymous)"}
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <span className="truncate text-xs font-medium">
+                      {change.entityName || "(anonymous)"}
+                    </span>
+                    {review ? (
+                      <RiskDots review={review} />
+                    ) : null}
                   </span>
                   <span className="block truncate font-mono text-[9px] leading-3 text-muted-foreground">
                     {change.entityType}
@@ -169,8 +174,7 @@ export function EntityPanel({
                     {change.startLine ? ` · L${change.startLine}` : ""}
                   </span>
                 </span>
-                <span className="flex w-[3.75rem] items-center justify-end gap-2">
-                  {review ? <RiskBadge review={review} /> : null}
+                <span className="flex w-5 items-center justify-end">
                   <ChangeBadge changeType={change.changeType} />
                 </span>
               </button>
