@@ -17,6 +17,7 @@ async function run(command: string, args: string[], cwd: string) {
   return execFileAsync(command, args, {
     cwd,
     encoding: "utf8",
+    env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
     maxBuffer: 2 * 1024 * 1024,
   });
 }

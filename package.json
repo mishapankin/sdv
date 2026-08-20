@@ -27,6 +27,7 @@
     "@panzoom/panzoom": "^4.6.2",
     "@pierre/diffs": "^1.2.12",
     "@tanstack/react-query": "^5.101.4",
+    "chokidar": "^5.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "commander": "^15.0.0",

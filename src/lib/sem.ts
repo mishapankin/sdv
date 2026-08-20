@@ -71,6 +71,7 @@ async function run(
   const { stdout, stderr } = await execFileAsync(command, args, {
     cwd,
     encoding: "utf8",
+    env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
     maxBuffer: 20 * 1024 * 1024,
   });
 
@@ -85,6 +86,7 @@ async function runBinary(
   const { stdout, stderr } = await execFileAsync(command, args, {
     cwd,
     encoding: null,
+    env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
     maxBuffer: MAX_IMAGE_PREVIEW_BYTES + 1024,
   });
 

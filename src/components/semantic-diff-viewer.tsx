@@ -48,6 +48,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Switch } from "@/components/ui/switch";
+import { useAutoRefresh } from "@/components/use-auto-refresh";
 import { useViewerUrlState } from "@/components/use-viewer-url-state";
 import {
   EmptyState,
@@ -251,12 +253,15 @@ export function SemanticDiffViewer() {
       fileKind: selectedFileKind,
     });
   const isRefreshing =
-    repositoriesQuery.isFetching || query.isFetching || fileQuery.isFetching;
+    repositoriesQuery.isFetching ||
+    query.isFetching ||
+    fileQuery.isFetching ||
+    commitsQuery.isFetching;
   async function refreshDiff() {
     const refreshed = await query.refetch();
     const filePathToRefresh = fileDiffPath;
 
-    if (!refreshed.data?.ok || activeRepoId === undefined) return;
+    if (!refreshed.data?.ok || activeRepoId === undefined) return false;
 
     if (
       filePathToRefresh &&
@@ -269,7 +274,7 @@ export function SemanticDiffViewer() {
     ) {
       removeFileDiffQueries(queryClient, activeRepoId, comparison);
       setSelection(null);
-      return;
+      return true;
     }
 
     await invalidateFileDiffQueries(
@@ -277,12 +282,22 @@ export function SemanticDiffViewer() {
       activeRepoId,
       comparison,
     );
+    return true;
   }
 
   async function refreshAll() {
-    await repositoriesQuery.refetch();
-    await refreshDiff();
+    const [refreshed] = await Promise.all([
+      refreshDiff(),
+      repositoriesQuery.refetch(),
+      commitsQuery.refetch(),
+    ]);
+    return refreshed;
   }
+
+  const autoRefresh = useAutoRefresh({
+    repoId: activeRepoId,
+    refresh: refreshAll,
+  });
 
   function selectEntity(entityId: string) {
     setSelection({ type: "entity", entityId });
@@ -367,17 +382,53 @@ export function SemanticDiffViewer() {
             ) : null}
             <Tooltip>
               <TooltipTrigger asChild>
+                <label className="flex h-8 cursor-pointer items-center gap-2 rounded-lg px-2 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                  <span>Auto</span>
+                  <span className="relative flex items-center">
+                    <Switch
+                      checked={autoRefresh.enabled}
+                      onCheckedChange={autoRefresh.setEnabled}
+                      aria-label="Automatically refresh when repository files change"
+                    />
+                    {autoRefresh.connectionStatus === "disconnected" ? (
+                      <span
+                        className="absolute -right-1 -top-1 size-1.5 rounded-full bg-amber-500 ring-2 ring-background"
+                        aria-hidden="true"
+                      />
+                    ) : null}
+                  </span>
+                </label>
+              </TooltipTrigger>
+              <TooltipContent>
+                {autoRefresh.connectionStatus === "disconnected"
+                  ? "Auto refresh unavailable"
+                  : "Automatically refresh when repository files change"}
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
                 <Button
                   size="icon"
                   variant="ghost"
                   aria-label="Refresh diff"
-                  onClick={refreshDiff}
+                  onClick={() => void autoRefresh.refreshNow()}
                   disabled={isRefreshing}
+                  className="relative"
                 >
                   <RefreshCw className={cn(isRefreshing && "animate-spin")} />
+                  {autoRefresh.changeDetected && !autoRefresh.enabled ? (
+                    <span
+                      className="absolute right-1 top-1 size-1.5 rounded-full bg-primary ring-2 ring-background"
+                      aria-hidden="true"
+                    />
+                  ) : null}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Refresh diff</TooltipContent>
+              <TooltipContent>
+                {autoRefresh.changeDetected && !autoRefresh.enabled
+                  ? "Repository changed — refresh now"
+                  : "Refresh now"}
+              </TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
