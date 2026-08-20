@@ -10,7 +10,6 @@ import {
   CirclePlus,
   GitBranch,
   GitCommitHorizontal,
-  GitMerge,
   Minus,
   RefreshCw,
   Settings,
@@ -38,6 +37,7 @@ import {
 } from "@/components/file-diff-view";
 import { ImageDiffView } from "@/components/image-diff-view";
 import { LayoutControls } from "@/components/layout-controls";
+import { ViewOptions } from "@/components/view-options";
 import { RepositoryRail } from "@/components/repository-rail";
 import { Button } from "@/components/ui/button";
 import {
@@ -134,13 +134,17 @@ export function SemanticDiffViewer() {
   );
   const {
     comparison,
+    diffLayout,
     mergeModuleChanges,
+    wrapLongLines,
     showRepositoryRail,
     selectedRepoId,
     selectRepository: setRepositoryInUrl,
     selectComparisonMode,
     compareCommits,
+    setDiffLayout,
     toggleModuleMerge: toggleModuleMergeInUrl,
+    toggleWrapLongLines,
   } = useViewerUrlState(repositories);
   const activeRepository =
     repositories.find((repo) => repo.id === selectedRepoId);
@@ -385,25 +389,14 @@ export function SemanticDiffViewer() {
                 </span>
               </div>
             ) : null}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  size="sm"
-                  variant={mergeModuleChanges ? "secondary" : "outline"}
-                  aria-pressed={mergeModuleChanges}
-                  onClick={toggleModuleMerge}
-                  className="hidden sm:inline-flex"
-                >
-                  <GitMerge />
-                  Module merge: {mergeModuleChanges ? "on" : "off"}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                {mergeModuleChanges
-                  ? "Show module-level additions and deletions separately"
-                  : "Merge matching module-level additions and deletions"}
-              </TooltipContent>
-            </Tooltip>
+            <ViewOptions
+              diffLayout={diffLayout}
+              wrapLongLines={wrapLongLines}
+              mergeModuleChanges={mergeModuleChanges}
+              onDiffLayoutChange={setDiffLayout}
+              onToggleWrapLongLines={toggleWrapLongLines}
+              onToggleModuleMerge={toggleModuleMerge}
+            />
             {diff && fileGroups.length > 0 && selectedFileGroup ? (
               <LayoutControls
                 leftExpanded={leftSidebarExpanded}
@@ -531,6 +524,8 @@ export function SemanticDiffViewer() {
                           cacheKey={fileQuery.data.data.cacheKey}
                           comparison={comparison}
                           target={fileTarget}
+                          diffLayout={diffLayout}
+                          wrapLongLines={wrapLongLines}
                         />
                       ) : null}
                       {fileDiffPath &&
@@ -570,6 +565,8 @@ export function SemanticDiffViewer() {
                               target,
                             })
                           }
+                          diffLayout={diffLayout}
+                          wrapLongLines={wrapLongLines}
                           onPreviousEntity={
                             selectedEntityIndex > 0
                               ? () =>

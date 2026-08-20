@@ -6,12 +6,17 @@ import { useEffect } from "react";
 import { getComparisonFromSearchParams } from "@/lib/comparison";
 import type { Comparison, WorkspaceRepository } from "@/lib/sem-types";
 
+export type DiffLayout = "split" | "unified";
+
 export function useViewerUrlState(repositories: WorkspaceRepository[]) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const comparison = getComparisonFromSearchParams(searchParams);
   const requestedRepoId = searchParams.get("repo") ?? undefined;
   const mergeModuleChanges = searchParams.get("merge-module") !== "off";
+  const diffLayout: DiffLayout =
+    searchParams.get("diff-layout") === "inline" ? "unified" : "split";
+  const wrapLongLines = searchParams.get("wrap-lines") === "on";
   const showRepositoryRail = repositories.some((repo) => repo.id !== ".");
   const selectedRepoId = requestedRepoId ?? repositories[0]?.id;
 
@@ -106,14 +111,42 @@ export function useViewerUrlState(repositories: WorkspaceRepository[]) {
     replaceSearchParams(params);
   }
 
+  function setDiffLayout(layout: DiffLayout) {
+    const params = new URLSearchParams(searchParams.toString());
+
+    if (layout === "split") {
+      params.delete("diff-layout");
+    } else {
+      params.set("diff-layout", "inline");
+    }
+
+    replaceSearchParams(params);
+  }
+
+  function toggleWrapLongLines() {
+    const params = new URLSearchParams(searchParams.toString());
+
+    if (wrapLongLines) {
+      params.delete("wrap-lines");
+    } else {
+      params.set("wrap-lines", "on");
+    }
+
+    replaceSearchParams(params);
+  }
+
   return {
     comparison,
+    diffLayout,
     mergeModuleChanges,
+    wrapLongLines,
     showRepositoryRail,
     selectedRepoId,
     selectRepository,
     selectComparisonMode,
     compareCommits,
+    setDiffLayout,
     toggleModuleMerge,
+    toggleWrapLongLines,
   };
 }

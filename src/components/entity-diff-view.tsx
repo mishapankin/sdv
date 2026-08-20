@@ -29,6 +29,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { DiffLineTarget } from "@/lib/diff-selection";
+import type { DiffLayout } from "@/components/use-viewer-url-state";
 import { formatInspectClassification } from "@/lib/inspect-view-model";
 import type { InspectEntityReview } from "@/lib/inspect-types";
 import type { SemanticChange } from "@/lib/sem-types";
@@ -70,6 +71,8 @@ export function EntityDiffView({
   onPreviousEntity,
   onNextEntity,
   onViewInContext,
+  diffLayout,
+  wrapLongLines,
 }: {
   change: SemanticChange;
   inspectReview?: InspectEntityReview;
@@ -77,6 +80,8 @@ export function EntityDiffView({
   onPreviousEntity?: () => void;
   onNextEntity?: () => void;
   onViewInContext: (target?: DiffLineTarget) => void;
+  diffLayout: DiffLayout;
+  wrapLongLines: boolean;
 }) {
   const fileDiff = useMemo(
     () => createEntityFileDiff(change, renderVersion),
@@ -265,6 +270,8 @@ export function EntityDiffView({
         fileDiff={fileDiff}
         itemId={itemId}
         syncKey={`${change.entityId}:${renderVersion}`}
+        diffLayout={diffLayout}
+        wrapLongLines={wrapLongLines}
       />
     </main>
   );

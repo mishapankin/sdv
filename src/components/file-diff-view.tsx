@@ -14,6 +14,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { getComparisonLabel } from "@/lib/comparison";
 import type { DiffLineTarget } from "@/lib/diff-selection";
+import type { DiffLayout } from "@/components/use-viewer-url-state";
 import type { Comparison } from "@/lib/sem-types";
 
 export function FileDiffView({
@@ -24,6 +25,8 @@ export function FileDiffView({
   cacheKey,
   comparison,
   target,
+  diffLayout,
+  wrapLongLines,
 }: {
   filePath: string;
   oldFilePath: string;
@@ -32,6 +35,8 @@ export function FileDiffView({
   cacheKey: string;
   comparison: Comparison;
   target?: DiffLineTarget;
+  diffLayout: DiffLayout;
+  wrapLongLines: boolean;
 }) {
   const fileDiff = useMemo(
     () => {
@@ -136,6 +141,8 @@ export function FileDiffView({
           fileDiff={fileDiff}
           itemId={itemId}
           syncKey={cacheKey}
+          diffLayout={diffLayout}
+          wrapLongLines={wrapLongLines}
         />
       ) : (
         <div className="min-h-0 flex-1 p-5">
