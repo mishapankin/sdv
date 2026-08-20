@@ -68,7 +68,7 @@ export function ViewOptions({
             <Button
               type="button"
               size="icon"
-              variant="outline"
+              variant="ghost"
               aria-label="Open view options"
             >
               <SlidersHorizontal />

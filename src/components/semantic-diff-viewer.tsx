@@ -7,10 +7,7 @@ import {
 } from "@tanstack/react-query";
 import { WorkerPoolContextProvider } from "@pierre/diffs/react";
 import {
-  CirclePlus,
   GitBranch,
-  GitCommitHorizontal,
-  Minus,
   RefreshCw,
   Settings,
 } from "lucide-react";
@@ -58,11 +55,7 @@ import {
   LoadingState,
   NoRepositoriesState,
 } from "@/components/viewer-states";
-import {
-  getComparisonLabel,
-  getGitFileDiffCommand,
-  getSemCommand,
-} from "@/lib/comparison";
+import { getComparisonLabel } from "@/lib/comparison";
 import {
   resolveDiffSelection,
   type DiffSelection,
@@ -259,14 +252,6 @@ export function SemanticDiffViewer() {
     });
   const isRefreshing =
     repositoriesQuery.isFetching || query.isFetching || fileQuery.isFetching;
-  const statusCommand = fileDiffPath
-    ? getGitFileDiffCommand(
-        comparison,
-        fileDiffPath,
-        selectedFileGroup?.fileChange?.changeType === "untracked",
-      )
-    : getSemCommand(comparison);
-
   async function refreshDiff() {
     const refreshed = await query.refetch();
     const filePathToRefresh = fileDiffPath;
@@ -350,16 +335,7 @@ export function SemanticDiffViewer() {
             </div>
           ) : null}
 
-          <div
-            className={cn(
-              "flex min-w-max flex-1 items-center gap-3",
-              diff && "border-l pl-4",
-            )}
-          >
-            <div className="flex shrink-0 items-center gap-2 text-xs font-medium text-muted-foreground">
-              <GitCommitHorizontal className="size-4" />
-              Compare
-            </div>
+          <div className="flex min-w-max flex-1 items-center">
             <ComparisonSelector
               key={getComparisonLabel(comparison)}
               comparison={comparison}
@@ -369,26 +345,7 @@ export function SemanticDiffViewer() {
             />
           </div>
 
-          <div className="ml-auto flex shrink-0 items-center gap-3">
-            {diff ? (
-              <div
-                className="hidden items-center gap-2 font-mono text-xs md:flex"
-                aria-label={`${diff.gitSummary.fileCount} files changed, ${diff.gitSummary.additions} additions, ${diff.gitSummary.deletions} deletions`}
-              >
-                <span className="text-muted-foreground">
-                  {diff.gitSummary.fileCount}{" "}
-                  {diff.gitSummary.fileCount === 1
-                    ? "file changed"
-                    : "files changed"}
-                </span>
-                <span className="font-medium text-emerald-700 dark:text-emerald-400">
-                  +{diff.gitSummary.additions}
-                </span>
-                <span className="font-medium text-rose-700 dark:text-rose-400">
-                  −{diff.gitSummary.deletions}
-                </span>
-              </div>
-            ) : null}
+          <div className="ml-auto flex shrink-0 items-center gap-1">
             <ViewOptions
               diffLayout={diffLayout}
               wrapLongLines={wrapLongLines}
@@ -412,7 +369,7 @@ export function SemanticDiffViewer() {
               <TooltipTrigger asChild>
                 <Button
                   size="icon"
-                  variant="outline"
+                  variant="ghost"
                   aria-label="Refresh diff"
                   onClick={refreshDiff}
                   disabled={isRefreshing}
@@ -424,7 +381,7 @@ export function SemanticDiffViewer() {
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button size="icon" variant="outline" asChild>
+                <Button size="icon" variant="ghost" asChild>
                   <Link href="/settings" aria-label="Open settings">
                     <Settings />
                   </Link>
@@ -493,6 +450,7 @@ export function SemanticDiffViewer() {
                       <DiffSidebar
                         changes={visibleChanges}
                         fileChanges={visibleFileChanges}
+                        gitSummary={diff.gitSummary}
                         selectedFilePath={effectiveSelectedFilePath}
                         onSelectFile={selectFile}
                       />
@@ -628,20 +586,6 @@ export function SemanticDiffViewer() {
           ) : null}
         </div>
 
-        <footer className="flex h-7 shrink-0 items-center justify-between border-t bg-card px-3 font-mono text-[10px] text-muted-foreground">
-          <span className="flex min-w-0 flex-1 items-center gap-1.5">
-            <CirclePlus className="size-3 shrink-0" />
-            <span className="truncate" title={statusCommand}>
-              {statusCommand}
-            </span>
-          </span>
-          {diff ? (
-            <span className="flex shrink-0 items-center gap-1.5 pl-3">
-              <Minus className="size-3" />
-              refreshed {new Date(diff.refreshedAt).toLocaleTimeString()}
-            </span>
-          ) : null}
-        </footer>
         </div>
       </TooltipProvider>
     </WorkerPoolContextProvider>

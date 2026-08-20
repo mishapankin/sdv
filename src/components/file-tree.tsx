@@ -52,8 +52,8 @@ function DirectoryNode({
           title={node.path}
         >
           <ChevronRight className="size-3.5 shrink-0 text-muted-foreground transition-transform group-data-[state=open]/directory-trigger:rotate-90" />
-          <Folder className="size-3.5 shrink-0 text-amber-600 group-data-[state=open]/directory-trigger:hidden dark:text-amber-400" />
-          <FolderOpen className="hidden size-3.5 shrink-0 text-amber-600 group-data-[state=open]/directory-trigger:block dark:text-amber-400" />
+          <Folder className="size-3.5 shrink-0 text-muted-foreground group-data-[state=open]/directory-trigger:hidden" />
+          <FolderOpen className="hidden size-3.5 shrink-0 text-muted-foreground group-data-[state=open]/directory-trigger:block" />
           <span className="min-w-0 flex-1 truncate">{node.name}</span>
           <span className="font-mono text-[10px] text-muted-foreground">
             {node.fileCount}
@@ -119,7 +119,7 @@ export function FileTree({ fileGroups, ...selectionProps }: FileTreeProps) {
   const nodes = useMemo(() => buildFileTree(fileGroups), [fileGroups]);
 
   return (
-    <nav aria-label="Changed files" className="py-2">
+    <nav aria-label="Changed files" className="pb-2">
       {nodes.map((node) => (
         <TreeNode
           key={`${node.type}:${node.path}`}

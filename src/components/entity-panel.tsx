@@ -4,7 +4,6 @@ import { FileCode2 } from "lucide-react";
 
 import { ChangeBadge } from "@/components/change-badge";
 import { EntityIcon } from "@/components/entity-icons";
-import { FileTypeIcon } from "@/components/file-type-icon";
 import { RiskDots } from "@/components/risk-badge";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -59,7 +58,6 @@ export function EntityPanel({
   onSelectFullFile: () => void;
   onSelectEntity: (entityId: string) => void;
 }) {
-  const fileName = fileGroup.filePath.split("/").at(-1) ?? fileGroup.filePath;
   const reviewsByEntityId = indexInspectReviews(inspectReviews);
   const isFullFileSelected = selectedEntityId === undefined;
   const selectedRowClass =
@@ -67,38 +65,29 @@ export function EntityPanel({
 
   return (
     <aside className="flex h-full min-w-0 flex-col bg-sidebar/60">
-      <div className="flex h-12 shrink-0 items-center gap-2 border-b px-3">
-        <FileTypeIcon
-          filePath={fileGroup.filePath}
-          className="size-4 shrink-0"
-        />
-        <div className="min-w-0 flex-1">
-          <div className="text-[10px] font-semibold tracking-[0.12em] text-muted-foreground uppercase">
-            Changes in
-          </div>
-          <div
-            className="truncate text-xs font-medium"
-            title={fileGroup.filePath}
-          >
-            {fileName}
-          </div>
-        </div>
+      <div className="flex h-12 shrink-0 items-center justify-between px-3">
+        <span className="text-[10px] font-semibold tracking-[0.12em] text-muted-foreground uppercase">
+          Semantic entities
+        </span>
+        <Badge
+          variant="secondary"
+          className="h-5 rounded-md px-1.5 font-mono text-[9px]"
+        >
+          {fileGroup.changes.length}
+        </Badge>
       </div>
 
       <ScrollArea className="min-h-0 flex-1">
         <nav
           aria-label={`Views and changes in ${fileGroup.filePath}`}
-          className="py-3"
+          className="pb-3"
         >
-          <div className="px-3 pb-1.5 text-[9px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
-            File view
-          </div>
           <button
             type="button"
             onClick={onSelectFullFile}
             aria-current={isFullFileSelected ? "page" : undefined}
             className={cn(
-              "relative mx-2 flex h-12 w-[calc(100%_-_1rem)] items-center gap-2 rounded-md px-2.5 text-left transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50",
+              "relative mx-2 flex h-9 w-[calc(100%_-_1rem)] items-center gap-2 rounded-md px-2.5 text-left transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50",
               isFullFileSelected && selectedRowClass,
             )}
           >
@@ -109,27 +98,10 @@ export function EntityPanel({
                   "text-sky-700 dark:text-sky-300",
               )}
             />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-xs font-medium">
-                Full file diff
-              </span>
-              <span className="block font-mono text-[9px] leading-3 text-muted-foreground">
-                Git patch
-              </span>
+            <span className="min-w-0 flex-1 truncate text-xs font-medium">
+              Full file diff
             </span>
           </button>
-
-          <div className="mt-3 flex items-center justify-between border-t px-3 pt-3 pb-1.5">
-            <span className="text-[9px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
-              Semantic entities
-            </span>
-            <Badge
-              variant="secondary"
-              className="h-5 rounded-md px-1.5 font-mono text-[9px]"
-            >
-              {fileGroup.changes.length}
-            </Badge>
-          </div>
 
           {fileGroup.changes.map((change) => {
             const review = reviewsByEntityId.get(change.entityId);
