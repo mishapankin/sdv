@@ -56,7 +56,7 @@ export function WindowControlsSetting() {
   }
 
   return (
-    <div className="border-t pt-4">
+    <div className="border-t py-3">
       <div className="flex items-center justify-between gap-4">
         <label className="text-xs font-medium" htmlFor="window-controls">
           Window controls

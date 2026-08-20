@@ -22,6 +22,8 @@ declare global {
       openRecentRepository(path: string): Promise<
         { ok: true } | { ok: false; error: string }
       >;
+      getSettingsPath(): Promise<string>;
+      copySettingsPath(): Promise<void>;
       getTheme(): Promise<"system" | "light" | "dark">;
       setTheme(theme: "system" | "light" | "dark"): Promise<void>;
       getWindowControls(): Promise<{

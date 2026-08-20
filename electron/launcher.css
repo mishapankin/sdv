@@ -1,14 +1,14 @@
 :root {
   color-scheme: light;
   --desktop-titlebar-height: 0px;
-  --background: #f8f9fa;
-  --foreground: #20242a;
-  --card: #ffffff;
-  --muted: #f1f2f4;
-  --muted-foreground: #737982;
-  --border: #dfe2e6;
-  --input: #dfe2e6;
-  --ring: #9ca3ad;
+  --background: oklch(0.985 0.003 247.86);
+  --foreground: oklch(0.19 0.015 255);
+  --card: oklch(1 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --border: oklch(0.91 0.008 255);
+  --input: oklch(0.91 0.008 255);
+  --ring: oklch(0.708 0 0);
   --success: #16833e;
   --destructive: #bd3c42;
   --radius: 9px;
@@ -153,22 +153,6 @@ button:focus-visible {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-    --background: #171a1f;
-    --foreground: #f4f4f5;
-    --card: #202329;
-    --muted: #292d34;
-    --muted-foreground: #a3a8b0;
-    --border: #343942;
-    --input: #343942;
-    --ring: #737982;
-    --success: #45bd70;
-    --destructive: #ed6a70;
-  }
 }
 
 .open-button {
@@ -452,16 +436,16 @@ h2 {
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
-    --background: #272a2f;
-    --foreground: #f4f4f5;
-    --card: #303338;
-    --muted: #393d43;
-    --muted-foreground: #a7abb2;
-    --border: #44484f;
-    --input: #4b5058;
-    --ring: #8f959e;
-    --success: #4db86b;
-    --destructive: #ee7779;
+    --background: oklch(0.16 0.012 255);
+    --foreground: oklch(0.985 0 0);
+    --card: oklch(0.19 0.012 255);
+    --muted: oklch(0.245 0.012 255);
+    --muted-foreground: oklch(0.708 0 0);
+    --border: oklch(1 0 0 / 10%);
+    --input: oklch(1 0 0 / 15%);
+    --ring: oklch(0.556 0 0);
+    --success: #45bd70;
+    --destructive: oklch(0.704 0.191 22.216);
   }
 }
 

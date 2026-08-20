@@ -13,6 +13,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   app,
   BrowserWindow,
+  clipboard,
   dialog,
   ipcMain,
   Menu,
@@ -328,7 +329,7 @@ function createWindow(bounds) {
     minHeight: 600,
     ...(bounds || {}),
     show: false,
-    backgroundColor: "#181a1f",
+    backgroundColor: "#0a0e12",
     ...(useCustomControls ? { frame: false } : {}),
     webPreferences: {
       contextIsolation: true,
@@ -485,6 +486,22 @@ async function selectRepository() {
 }
 
 function installIpcHandlers() {
+  ipcMain.handle("sdv:get-settings-path", (event) => {
+    if (!isTrustedSender(event)) {
+      throw new Error("untrusted IPC sender");
+    }
+
+    return getDesktopSettingsPath();
+  });
+
+  ipcMain.handle("sdv:copy-settings-path", (event) => {
+    if (!isTrustedSender(event)) {
+      throw new Error("untrusted IPC sender");
+    }
+
+    clipboard.writeText(getDesktopSettingsPath());
+  });
+
   ipcMain.handle("sdv:get-theme", (event) => {
     if (!isTrustedSender(event)) {
       throw new Error("untrusted IPC sender");
