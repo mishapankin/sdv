@@ -151,6 +151,8 @@ export type GitCommit = {
   hash: string;
   shortHash: string;
   subject: string;
+  author: string;
+  authoredAt: string;
   relativeDate: string;
   refs: string;
 };
@@ -162,6 +164,14 @@ export type GitCommitsResult =
     }
   | {
       ok: false;
+      error: string;
+    };
+
+export type GitRefValidationResult =
+  | { ok: true }
+  | {
+      ok: false;
+      field: "from" | "to";
       error: string;
     };
 

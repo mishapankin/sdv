@@ -20,6 +20,7 @@ import {
   getRecentCommits,
   getSemanticDiff,
   getWorkspaceRepositories,
+  validateGitRefs,
 } from "@/app/actions";
 import { ComparisonSelector } from "@/components/comparison-controls";
 import { DiffSidebar } from "@/components/diff-sidebar";
@@ -319,9 +320,13 @@ export function SemanticDiffViewer() {
     selectComparisonMode(mode);
   }
 
-  function changeComparedCommits(from: string, to: string) {
+  async function changeComparedCommits(from: string, to: string) {
+    const validation = await validateGitRefs(from, to, activeRepoId);
+
+    if (!validation.ok) return validation;
     setSelection(null);
     compareCommits(from, to);
+    return validation;
   }
 
   function toggleModuleMerge() {
@@ -355,6 +360,14 @@ export function SemanticDiffViewer() {
               key={getComparisonLabel(comparison)}
               comparison={comparison}
               commits={commitsQuery.data?.ok ? commitsQuery.data.data : []}
+              commitsLoading={commitsQuery.isPending}
+              commitsError={
+                commitsQuery.data && !commitsQuery.data.ok
+                  ? commitsQuery.data.error
+                  : commitsQuery.error instanceof Error
+                    ? commitsQuery.error.message
+                    : undefined
+              }
               onModeChange={changeComparisonMode}
               onCompare={changeComparedCommits}
             />

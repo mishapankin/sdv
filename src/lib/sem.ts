@@ -27,6 +27,8 @@ import {
   type FileOnlyChange,
   type FileDiffResult,
   type GitCommitsResult,
+  type GitCommit,
+  type GitRefValidationResult,
   type ImageSnapshot,
   type SemDiff,
   semDiffSchema,
@@ -760,34 +762,87 @@ export async function readRecentCommits(
 ): Promise<GitCommitsResult> {
   try {
     const cwd = await resolveRepositoryDirectory(repoId);
-    const { stdout } = await run(
-      "git",
-      [
-        "log",
-        "--all",
-        "-n",
-        "100",
-        "--date=relative",
-        "--format=%H%x1f%h%x1f%s%x1f%ar%x1f%D%x1e",
-      ],
-      cwd,
-    );
-    const commits = stdout
-      .split("\x1e")
-      .map((record) => record.trim())
-      .filter(Boolean)
-      .map((record) => {
-        const [hash, shortHash, subject, relativeDate, refs] =
-          record.split("\x1f");
+    return readRecentCommitsFromRepository(cwd);
+  } catch (error) {
+    const message = getProcessError(error);
+    reportError(message);
+    return { ok: false, error: message };
+  }
+}
 
-        return {
-          hash: hash ?? "",
-          shortHash: shortHash ?? "",
-          subject: subject ?? "",
-          relativeDate: relativeDate ?? "",
-          refs: refs ?? "",
-        };
-      });
+const COMMIT_LOG_FORMAT =
+  "%H%x1f%h%x1f%s%x1f%an%x1f%aI%x1f%ar%x1f%D%x1e";
+
+function parseCommitLog(stdout: string): GitCommit[] {
+  return stdout
+    .split("\x1e")
+    .map((record) => record.trim())
+    .filter(Boolean)
+    .map((record) => {
+      const [
+        hash,
+        shortHash,
+        subject,
+        author,
+        authoredAt,
+        relativeDate,
+        refs,
+      ] = record.split("\x1f");
+
+      return {
+        hash: hash ?? "",
+        shortHash: shortHash ?? "",
+        subject: subject ?? "",
+        author: author ?? "",
+        authoredAt: authoredAt ?? "",
+        relativeDate: relativeDate ?? "",
+        refs: refs ?? "",
+      };
+    });
+}
+
+export async function readRecentCommitsFromRepository(
+  cwd: string,
+  execute: CommandRunner = run,
+): Promise<GitCommitsResult> {
+  try {
+    const [current, repository] = await Promise.all([
+      execute(
+        "git",
+        [
+          "log",
+          "HEAD",
+          "-n",
+          "200",
+          "--date=relative",
+          `--format=${COMMIT_LOG_FORMAT}`,
+        ],
+        cwd,
+      ),
+      execute(
+        "git",
+        [
+          "log",
+          "--branches",
+          "--remotes",
+          "--tags",
+          "-n",
+          "500",
+          "--date=relative",
+          `--format=${COMMIT_LOG_FORMAT}`,
+        ],
+        cwd,
+      ),
+    ]);
+    const seen = new Set<string>();
+    const commits = [
+      ...parseCommitLog(current.stdout),
+      ...parseCommitLog(repository.stdout),
+    ].filter((commit) => {
+      if (!commit.hash || seen.has(commit.hash)) return false;
+      seen.add(commit.hash);
+      return true;
+    });
 
     return { ok: true, data: commits };
   } catch (error) {
@@ -795,4 +850,50 @@ export async function readRecentCommits(
     reportError(message);
     return { ok: false, error: message };
   }
+}
+
+export async function validateComparisonRefs(
+  from: string,
+  to: string,
+  repoId?: string,
+): Promise<GitRefValidationResult> {
+  try {
+    const cwd = await resolveRepositoryDirectory(repoId);
+    return validateComparisonRefsInRepository(from, to, cwd);
+  } catch (error) {
+    return {
+      ok: false,
+      field: "from",
+      error: getProcessError(error),
+    };
+  }
+}
+
+export async function validateComparisonRefsInRepository(
+  from: string,
+  to: string,
+  cwd: string,
+  execute: CommandRunner = run,
+): Promise<GitRefValidationResult> {
+  try {
+    await resolveCommit(execute, cwd, from);
+  } catch {
+    return {
+      ok: false,
+      field: "from",
+      error: `Base ref “${from}” does not resolve to a commit.`,
+    };
+  }
+
+  try {
+    await resolveCommit(execute, cwd, to);
+  } catch {
+    return {
+      ok: false,
+      field: "to",
+      error: `Compare ref “${to}” does not resolve to a commit.`,
+    };
+  }
+
+  return { ok: true };
 }

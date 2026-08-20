@@ -6,6 +6,7 @@ import {
   readFileDiff,
   readRecentCommits,
   readSemanticDiff,
+  validateComparisonRefs,
 } from "@/lib/sem";
 import { comparisonSchema } from "@/lib/sem-types";
 import { readWorkspaceRepositories } from "@/lib/workspace";
@@ -79,4 +80,48 @@ export async function getRecentCommits(repoId?: unknown) {
   }
 
   return readRecentCommits(parsedRepoId.data);
+}
+
+export async function validateGitRefs(
+  from: unknown,
+  to: unknown,
+  repoId?: unknown,
+) {
+  const refSchema = z
+    .string()
+    .trim()
+    .min(1)
+    .max(256)
+    .refine((ref) => !ref.includes("\0"), "Invalid Git ref");
+  const parsedFrom = refSchema.safeParse(from);
+  const parsedTo = refSchema.safeParse(to);
+  const parsedRepoId = repoIdSchema.safeParse(repoId);
+
+  if (!parsedFrom.success) {
+    return {
+      ok: false as const,
+      field: "from" as const,
+      error: "Invalid base ref.",
+    };
+  }
+  if (!parsedTo.success) {
+    return {
+      ok: false as const,
+      field: "to" as const,
+      error: "Invalid compare ref.",
+    };
+  }
+  if (!parsedRepoId.success) {
+    return {
+      ok: false as const,
+      field: "from" as const,
+      error: "Invalid repository id.",
+    };
+  }
+
+  return validateComparisonRefs(
+    parsedFrom.data,
+    parsedTo.data,
+    parsedRepoId.data,
+  );
 }
