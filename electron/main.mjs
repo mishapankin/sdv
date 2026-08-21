@@ -329,7 +329,7 @@ function createWindow(bounds) {
     minHeight: 600,
     ...(bounds || {}),
     show: false,
-    backgroundColor: "#101010",
+    backgroundColor: "#090a0a",
     ...(useCustomControls ? { frame: false } : {}),
     webPreferences: {
       contextIsolation: true,
