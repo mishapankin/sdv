@@ -2,16 +2,14 @@
 
 import { FileCode2 } from "lucide-react";
 
-import { ChangeBadge } from "@/components/change-badge";
+import { ChangeIndicator } from "@/components/change-badge";
 import { EntityIcon } from "@/components/entity-icons";
+import { EntityMetadataTooltip } from "@/components/entity-metadata-tooltip";
 import { RiskDots } from "@/components/risk-badge";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { FileGroup } from "@/lib/group-changes";
-import {
-  formatInspectClassification,
-  indexInspectReviews,
-} from "@/lib/inspect-view-model";
+import { indexInspectReviews } from "@/lib/inspect-view-model";
 import type { InspectEntityReview } from "@/lib/inspect-types";
 import { cn } from "@/lib/utils";
 
@@ -19,7 +17,7 @@ export function SemanticUnavailablePanel() {
   return (
     <aside className="flex h-full min-w-0 flex-col bg-sidebar/60">
       <div className="flex h-12 shrink-0 items-center border-b px-3">
-        <span className="text-[10px] font-semibold tracking-[0.12em] text-muted-foreground uppercase">
+        <span className="text-xs font-semibold text-foreground">
           Semantic analysis
         </span>
       </div>
@@ -66,12 +64,12 @@ export function EntityPanel({
   return (
     <aside className="flex h-full min-w-0 flex-col bg-sidebar/60">
       <div className="flex h-12 shrink-0 items-center justify-between px-3">
-        <span className="text-[10px] font-semibold tracking-[0.12em] text-muted-foreground uppercase">
+        <span className="text-xs font-semibold text-foreground">
           Semantic entities
         </span>
         <Badge
           variant="secondary"
-          className="h-5 rounded-md px-1.5 font-mono text-[9px]"
+          className="h-5 rounded-md px-1.5 text-[10px] tabular-nums"
         >
           {fileGroup.changes.length}
         </Badge>
@@ -106,48 +104,42 @@ export function EntityPanel({
             const review = reviewsByEntityId.get(change.entityId);
 
             return (
-              <button
+              <EntityMetadataTooltip
                 key={change.entityId}
-                type="button"
-                onClick={() => onSelectEntity(change.entityId)}
-                aria-current={
-                  selectedEntityId === change.entityId ? "page" : undefined
-                }
-                className={cn(
-                  "relative ml-2 grid h-11 w-[calc(100%_-_0.5rem)] grid-cols-[1rem_minmax(0,1fr)_1.25rem] items-center gap-x-2 overflow-hidden rounded-l-md rounded-r-none pr-3 pl-2.5 text-left transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50",
-                  selectedEntityId === change.entityId &&
-                    selectedRowClass,
-                )}
-                title={`${change.entityType}: ${change.entityName || "(anonymous)"}`}
+                change={change}
+                inspectReview={review}
               >
-                <EntityIcon
-                  entityType={change.entityType}
+                <button
+                  type="button"
+                  onClick={() => onSelectEntity(change.entityId)}
+                  aria-current={
+                    selectedEntityId === change.entityId ? "page" : undefined
+                  }
                   className={cn(
-                    "size-4 shrink-0 text-muted-foreground",
-                    selectedEntityId === change.entityId && "text-primary",
+                    "relative ml-2 grid h-9 w-[calc(100%_-_0.5rem)] grid-cols-[1rem_minmax(0,1fr)_1.25rem] items-center gap-x-2 overflow-hidden rounded-l-md rounded-r-none pr-3 pl-2.5 text-left transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50",
+                    selectedEntityId === change.entityId && selectedRowClass,
                   )}
-                />
-                <span className="min-w-0 overflow-hidden">
-                  <span className="flex min-w-0 items-center gap-1.5">
+                >
+                  <EntityIcon
+                    entityType={change.entityType}
+                    className={cn(
+                      "size-4 shrink-0 text-muted-foreground",
+                      selectedEntityId === change.entityId && "text-primary",
+                    )}
+                  />
+                  <span className="flex min-w-0 items-center gap-1.5 overflow-hidden">
                     <span className="truncate text-xs font-medium">
                       {change.entityName || "(anonymous)"}
                     </span>
                     {review ? (
-                      <RiskDots review={review} />
+                      <RiskDots riskLevel={review.riskLevel} />
                     ) : null}
                   </span>
-                  <span className="block truncate font-mono text-[9px] leading-3 text-muted-foreground">
-                    {change.entityType}
-                    {review
-                      ? ` · ${formatInspectClassification(review.classification)}`
-                      : ""}
-                    {change.startLine ? ` · L${change.startLine}` : ""}
+                  <span className="flex w-5 items-center justify-end">
+                    <ChangeIndicator changeType={change.changeType} />
                   </span>
-                </span>
-                <span className="flex w-5 items-center justify-end">
-                  <ChangeBadge changeType={change.changeType} />
-                </span>
-              </button>
+                </button>
+              </EntityMetadataTooltip>
             );
           })}
         </nav>

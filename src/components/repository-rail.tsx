@@ -39,7 +39,7 @@ export function RepositoryRail({
               {workspaceName}
             </span>
           </div>
-          <div className="mt-0.5 font-mono text-[10px] text-muted-foreground">
+          <div className="mt-0.5 text-[11px] text-muted-foreground tabular-nums">
             {dirtyCount}/{repositories.length} changed
           </div>
         </div>
@@ -66,58 +66,66 @@ export function RepositoryRail({
               repo.relativePath === "." ? repo.name : repo.relativePath;
 
             return (
-              <button
-                key={repo.id}
-                type="button"
-                onClick={() => onSelectRepo(repo.id)}
-                className={cn(
-                  "group flex w-full items-center gap-2 rounded-md border px-2.5 py-2 text-left transition-colors",
-                  selectedRepoId === repo.id
-                    ? "border-border bg-card shadow-xs"
-                    : "border-transparent hover:bg-sidebar-accent",
-                )}
-              >
-                <span
-                  className={cn(
-                    "size-2.5 shrink-0 rounded-full border",
-                    repo.error
-                      ? "border-rose-500 bg-rose-500"
-                      : repo.hasChanges
-                        ? "border-amber-500 bg-amber-500"
-                        : "border-emerald-600 bg-emerald-600",
-                  )}
-                  aria-hidden="true"
-                />
-                <span className="min-w-0 flex-1">
-                  <span
-                    className="block truncate text-[13px] font-medium"
-                    title={repoLabel}
+              <Tooltip key={repo.id} delayDuration={350}>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => onSelectRepo(repo.id)}
+                    className={cn(
+                      "group flex w-full items-center gap-2 rounded-md border px-2.5 py-2 text-left transition-colors",
+                      selectedRepoId === repo.id
+                        ? "border-border bg-card shadow-xs"
+                        : "border-transparent hover:bg-sidebar-accent",
+                    )}
                   >
-                    {repoLabel}
-                  </span>
-                  <span className="mt-0.5 flex min-w-0 items-center gap-1.5 truncate font-mono text-[10px] text-muted-foreground">
-                    <GitBranch className="size-3 shrink-0" />
-                    <span className="truncate">{repo.branchName}</span>
-                  </span>
-                </span>
-                <span
-                  className={cn(
-                    "flex h-5 min-w-5 shrink-0 items-center justify-center rounded border px-1 font-mono text-[10px] font-bold",
-                    repo.error
-                      ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300"
-                      : repo.hasChanges
-                        ? "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300"
-                        : "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300",
-                  )}
-                  title={
-                    repo.error
-                      ? repo.error
-                      : `${repo.changedFileCount} changed files`
-                  }
+                    <span
+                      className={cn(
+                        "size-2.5 shrink-0 rounded-full border",
+                        repo.error
+                          ? "border-rose-500 bg-rose-500"
+                          : repo.hasChanges
+                            ? "border-amber-500 bg-amber-500"
+                            : "border-emerald-600 bg-emerald-600",
+                      )}
+                      aria-hidden="true"
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[13px] font-medium">
+                        {repoLabel}
+                      </span>
+                      <span className="mt-0.5 flex min-w-0 items-center gap-1.5 truncate font-mono text-[10px] text-muted-foreground">
+                        <GitBranch className="size-3 shrink-0" />
+                        <span className="truncate">{repo.branchName}</span>
+                      </span>
+                    </span>
+                    <span
+                      className={cn(
+                        "flex h-5 min-w-5 shrink-0 items-center justify-center rounded border px-1 text-[10px] font-semibold tabular-nums",
+                        repo.error
+                          ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300"
+                          : repo.hasChanges
+                            ? "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300"
+                            : "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300",
+                      )}
+                    >
+                      {repo.error ? "!" : repo.changedFileCount}
+                    </span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent
+                  side="right"
+                  sideOffset={6}
+                  className="max-w-80 flex-col items-start gap-0.5"
                 >
-                  {repo.error ? "!" : repo.changedFileCount}
-                </span>
-              </button>
+                  <span className="font-medium">{repoLabel}</span>
+                  <span className="font-mono text-[10px] opacity-70">
+                    {repo.branchName} ·{" "}
+                    {repo.error
+                      ? repo.error
+                      : `${repo.changedFileCount} changed ${repo.changedFileCount === 1 ? "file" : "files"}`}
+                  </span>
+                </TooltipContent>
+              </Tooltip>
             );
           })}
         </nav>

@@ -32,17 +32,17 @@ export function DiffSidebar({
   return (
     <aside className="flex h-full min-w-0 flex-col bg-sidebar">
       <div
-        className="flex h-12 shrink-0 items-center gap-2 px-4 font-mono text-[11px]"
+        className="flex h-12 shrink-0 items-center gap-2 px-4 text-xs"
         aria-label={`${gitSummary.fileCount} files changed, ${gitSummary.additions} additions, ${gitSummary.deletions} deletions`}
       >
         <span className="text-muted-foreground">
           {gitSummary.fileCount}{" "}
           {gitSummary.fileCount === 1 ? "file changed" : "files changed"}
         </span>
-        <span className="font-medium text-emerald-700 dark:text-emerald-400">
+        <span className="font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
           +{gitSummary.additions}
         </span>
-        <span className="font-medium text-rose-700 dark:text-rose-400">
+        <span className="font-semibold tabular-nums text-rose-700 dark:text-rose-400">
           −{gitSummary.deletions}
         </span>
       </div>

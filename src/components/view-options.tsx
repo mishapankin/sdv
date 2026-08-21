@@ -1,6 +1,12 @@
 "use client";
 
-import { Columns2, Rows2, SlidersHorizontal } from "lucide-react";
+import {
+  CircleHelp,
+  Columns2,
+  Rows2,
+  SlidersHorizontal,
+} from "lucide-react";
+import { useId } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -27,21 +33,36 @@ function OptionToggle({
   description: string;
   onChange: () => void;
 }) {
+  const inputId = useId();
+
   return (
-    <label className="flex cursor-pointer items-start gap-2.5 rounded-md px-1.5 py-2 hover:bg-muted/60">
+    <div className="flex h-8 items-center gap-2 rounded-md px-1.5 hover:bg-muted/60">
       <input
+        id={inputId}
         type="checkbox"
+        aria-label={label}
         checked={checked}
         onChange={onChange}
-        className="mt-0.5 size-3.5 accent-primary"
+        className="size-3.5 accent-primary"
       />
-      <span className="min-w-0">
-        <span className="block text-xs font-medium">{label}</span>
-        <span className="mt-0.5 block text-[10px] leading-4 text-muted-foreground">
+      <label htmlFor={inputId} className="min-w-0 flex-1 cursor-pointer text-xs font-medium">
+        {label}
+      </label>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            aria-label={`About ${label}`}
+            className="flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+          >
+            <CircleHelp className="size-3.5" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="left" sideOffset={6} className="max-w-60">
           {description}
-        </span>
-      </span>
-    </label>
+        </TooltipContent>
+      </Tooltip>
+    </div>
   );
 }
 
@@ -77,16 +98,13 @@ export function ViewOptions({
         </TooltipTrigger>
         <TooltipContent>View options</TooltipContent>
       </Tooltip>
-      <PopoverContent align="end" sideOffset={8} className="w-72 p-2">
+      <PopoverContent align="end" sideOffset={8} className="w-64 p-2">
         <div className="px-1.5 pt-1 pb-2">
-          <div className="text-xs font-semibold">View options</div>
-          <p className="mt-0.5 text-[10px] text-muted-foreground">
-            Adjust how code and semantic changes are displayed.
-          </p>
+          <div className="text-sm font-semibold">View options</div>
         </div>
 
         <fieldset className="border-t px-1.5 pt-2">
-          <legend className="mb-1.5 text-[9px] font-semibold tracking-[0.12em] text-muted-foreground uppercase">
+          <legend className="mb-2 text-[11px] font-semibold text-foreground">
             Diff layout
           </legend>
           <div className="grid grid-cols-2 rounded-lg bg-muted p-0.5">

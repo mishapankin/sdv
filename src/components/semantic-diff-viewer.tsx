@@ -457,7 +457,9 @@ export function SemanticDiffViewer() {
         </header>
 
         <div className="flex min-h-0 flex-1">
-          {repositoriesQuery.isPending ? <LoadingState /> : null}
+          {repositoriesQuery.isPending ? (
+            <LoadingState label="Loading workspace" />
+          ) : null}
           {repositoriesQuery.data && !repositoriesQuery.data.ok ? (
             <ErrorState
               error={repositoriesQuery.data.error}
@@ -482,7 +484,9 @@ export function SemanticDiffViewer() {
                 />
               ) : null}
               <div className="min-w-0 flex-1">
-                {query.isPending ? <LoadingState /> : null}
+                {query.isPending ? (
+                  <LoadingState label="Running semantic diff" />
+                ) : null}
                 {result && !result.ok ? (
                   <ErrorState
                     error={result.error}
@@ -522,7 +526,7 @@ export function SemanticDiffViewer() {
                     <ResizableHandle />
                     <ResizablePanel minSize="480px">
                       {fileDiffPath && fileQuery.isPending ? (
-                        <LoadingState />
+                        <LoadingState label="Loading file diff" />
                       ) : null}
                       {fileDiffPath &&
                       fileQuery.data &&

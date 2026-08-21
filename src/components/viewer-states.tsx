@@ -23,7 +23,8 @@ export function EmptyState({ comparison }: { comparison: Comparison }) {
         </div>
         <h2 className="mt-4 text-base font-semibold">No changes found</h2>
         <p className="mt-1.5 text-sm leading-6 text-muted-foreground">
-          `sem` found no semantic entity changes for{" "}
+          <code className="font-mono text-foreground">sem</code> found no
+          semantic entity changes for{" "}
           {getComparisonLabel(comparison).toLowerCase()}.
         </p>
       </div>
@@ -71,12 +72,12 @@ export function ErrorState({
   );
 }
 
-export function LoadingState() {
+export function LoadingState({ label = "Loading diff" }: { label?: string }) {
   return (
     <div className="flex h-full w-full items-center justify-center bg-background">
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <LoaderCircle className="size-4 animate-spin" />
-        Running sem diff
+        {label}
       </div>
     </div>
   );
@@ -93,7 +94,8 @@ export function NoRepositoriesState() {
           No repositories found
         </h2>
         <p className="mt-1.5 text-sm leading-6 text-muted-foreground">
-          Run `sdv` from inside a Git worktree.
+          Run <code className="font-mono text-foreground">sdv</code> from
+          inside a Git worktree.
         </p>
       </div>
     </div>

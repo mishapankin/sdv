@@ -1,14 +1,6 @@
 "use client";
 
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import type {
-  InspectEntityReview,
-  InspectRiskLevel,
-} from "@/lib/inspect-types";
+import type { InspectRiskLevel } from "@/lib/inspect-types";
 import { cn } from "@/lib/utils";
 
 const riskLevels: InspectRiskLevel[] = [
@@ -53,40 +45,20 @@ function RiskDotScale({
 }
 
 export function RiskDots({
-  review,
+  riskLevel,
   className,
 }: {
-  review: Pick<
-    InspectEntityReview,
-    "riskLevel" | "riskScore" | "blastRadius" | "dependentCount"
-  >;
+  riskLevel: InspectRiskLevel;
   className?: string;
 }) {
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span
-          role="img"
-          aria-label={`${review.riskLevel} risk`}
-          className={cn("inline-flex shrink-0", className)}
-        >
-          <RiskDotScale riskLevel={review.riskLevel} compact />
-        </span>
-      </TooltipTrigger>
-      <TooltipContent
-        side="top"
-        sideOffset={6}
-        className="flex-col items-start gap-0.5 px-2.5 py-2"
-      >
-        <span className="font-medium capitalize">
-          {review.riskLevel} risk · score {review.riskScore.toFixed(2)}
-        </span>
-        <span className="font-mono text-[10px] opacity-75">
-          blast {review.blastRadius} · {review.dependentCount} dependent
-          {review.dependentCount === 1 ? "" : "s"}
-        </span>
-      </TooltipContent>
-    </Tooltip>
+    <span
+      role="img"
+      aria-label={`${riskLevel} risk`}
+      className={cn("inline-flex shrink-0", className)}
+    >
+      <RiskDotScale riskLevel={riskLevel} compact />
+    </span>
   );
 }
 

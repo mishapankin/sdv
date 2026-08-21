@@ -1,16 +1,10 @@
 "use client";
 
-import {
-  parseDiffFromFile,
-  type FileDiffMetadata,
-} from "@pierre/diffs";
 import type { CodeViewHandle } from "@pierre/diffs/react";
 import {
   ArrowRight,
   Maximize2,
-  Network,
   ShieldCheck,
-  Sparkles,
 } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
 
@@ -21,48 +15,14 @@ import {
   useHunkNavigation,
 } from "@/components/diff-navigation";
 import { EntityIcon } from "@/components/entity-icons";
-import { RiskMeter } from "@/components/risk-badge";
+import { EntityMetadataTooltip } from "@/components/entity-metadata-tooltip";
+import { RiskDots } from "@/components/risk-badge";
 import { Button } from "@/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { createEntityFileDiff } from "@/lib/entity-metadata";
 import type { DiffLineTarget } from "@/lib/diff-selection";
 import type { DiffLayout } from "@/components/use-viewer-url-state";
-import { formatInspectClassification } from "@/lib/inspect-view-model";
 import type { InspectEntityReview } from "@/lib/inspect-types";
 import type { SemanticChange } from "@/lib/sem-types";
-
-function createEntityFileDiff(
-  change: SemanticChange,
-  renderVersion: string,
-): FileDiffMetadata {
-  const oldName = change.oldFilePath || change.filePath;
-  const oldFile = {
-    name: oldName,
-    contents: change.beforeContent ?? "",
-    cacheKey: `${change.entityId}:${renderVersion}:before`,
-  };
-  const newFile = {
-    name: change.filePath,
-    contents: change.afterContent ?? "",
-    cacheKey: `${change.entityId}:${renderVersion}:after`,
-  };
-  const fileDiff = parseDiffFromFile(oldFile, newFile, {
-    context: 3,
-  });
-  const oldOffset = Math.max((change.oldStartLine ?? 1) - 1, 0);
-  const newOffset = Math.max((change.startLine ?? 1) - 1, 0);
-
-  for (const hunk of fileDiff.hunks) {
-    hunk.deletionStart += oldOffset;
-    hunk.additionStart += newOffset;
-    hunk.hunkSpecs = `@@ -${hunk.deletionStart},${hunk.deletionCount} +${hunk.additionStart},${hunk.additionCount} @@`;
-  }
-
-  return fileDiff;
-}
 
 export function EntityDiffView({
   change,
@@ -143,30 +103,35 @@ export function EntityDiffView({
   return (
     <main className="flex h-full min-w-0 flex-col bg-background">
       <header className="shrink-0 border-b bg-card">
-        <div className="flex min-h-20 items-center justify-between gap-4 px-6 py-3">
+        <div className="flex min-h-16 items-center justify-between gap-4 px-5 py-2.5">
           <div className="min-w-0">
-            <div className="flex items-center gap-2.5">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span
-                    tabIndex={0}
-                    aria-label={`${change.entityType} entity`}
-                    className="shrink-0 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
-                  >
-                    <EntityIcon
-                      entityType={change.entityType}
-                      className="size-5 text-foreground"
-                    />
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent className="font-mono uppercase">
-                  {change.entityType.toUpperCase()}
-                </TooltipContent>
-              </Tooltip>
-              <h1 className="truncate text-lg font-semibold tracking-tight">
-                {change.entityName || "(anonymous)"}
-              </h1>
-            </div>
+            <EntityMetadataTooltip
+              change={change}
+              inspectReview={inspectReview}
+              side="bottom"
+            >
+              <div
+                tabIndex={0}
+                className="flex w-fit max-w-full items-center gap-2.5 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+              >
+                <EntityIcon
+                  entityType={change.entityType}
+                  className="size-5 shrink-0 text-foreground"
+                />
+                <h1 className="truncate text-base font-semibold tracking-tight">
+                  {change.entityName || "(anonymous)"}
+                </h1>
+                {inspectReview ? (
+                  <RiskDots riskLevel={inspectReview.riskLevel} />
+                ) : null}
+                {inspectReview?.publicApi ? (
+                  <ShieldCheck
+                    className="size-3.5 shrink-0 text-orange-700 dark:text-orange-300"
+                    aria-label="Public API"
+                  />
+                ) : null}
+              </div>
+            </EntityMetadataTooltip>
             <div className="mt-1.5 flex items-center gap-2 truncate font-mono text-xs text-muted-foreground">
               {change.oldFilePath && change.oldFilePath !== change.filePath ? (
                 <>
@@ -179,12 +144,6 @@ export function EntityDiffView({
           </div>
 
           <div className="flex shrink-0 items-center gap-3 text-[11px] text-muted-foreground">
-            {change.structuralChange === false ? (
-              <span className="hidden items-center gap-1.5 xl:flex">
-                <Sparkles className="size-3.5" />
-                cosmetic
-              </span>
-            ) : null}
             <Button
               size="sm"
               variant="outline"
@@ -214,54 +173,6 @@ export function EntityDiffView({
           </div>
         </div>
 
-        {inspectReview ? (
-          <div
-            className="flex h-8 items-center gap-4 overflow-hidden border-t bg-muted/25 px-6 font-mono text-[10px] text-muted-foreground"
-            aria-label={`Inspect analysis: ${inspectReview.riskLevel} risk, score ${inspectReview.riskScore.toFixed(2)}`}
-          >
-            <span className="flex min-w-0 items-center gap-4 overflow-hidden">
-              <span className="shrink-0 font-semibold text-foreground uppercase">
-                {formatInspectClassification(inspectReview.classification)}
-              </span>
-              <span className="flex shrink-0 items-center gap-1.5">
-                <Network className="size-3" aria-hidden="true" />
-                blast{" "}
-                <strong className="text-foreground">
-                  {inspectReview.blastRadius}
-                </strong>
-              </span>
-              <span className="shrink-0">
-                <strong className="text-foreground">
-                  {inspectReview.dependentCount}
-                </strong>{" "}
-                dependent{inspectReview.dependentCount === 1 ? "" : "s"}
-              </span>
-              <span className="hidden shrink-0 xl:inline">
-                <strong className="text-foreground">
-                  {inspectReview.dependencyCount}
-                </strong>{" "}
-                dependencies
-              </span>
-              {inspectReview.groupLabel ? (
-                <span className="hidden shrink-0 truncate xl:inline">
-                  group{" "}
-                  <strong className="text-foreground">
-                    {inspectReview.groupLabel}
-                  </strong>
-                </span>
-              ) : null}
-            </span>
-            <span className="ml-auto flex shrink-0 items-center gap-4">
-              {inspectReview.publicApi ? (
-                <span className="flex shrink-0 items-center gap-1.5 font-semibold text-orange-700 uppercase dark:text-orange-300">
-                  <ShieldCheck className="size-3" aria-hidden="true" />
-                  public API
-                </span>
-              ) : null}
-              <RiskMeter riskLevel={inspectReview.riskLevel} />
-            </span>
-          </div>
-        ) : null}
       </header>
 
       <DiffCodeView
