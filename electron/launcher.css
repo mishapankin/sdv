@@ -1,14 +1,14 @@
 :root {
   color-scheme: light;
   --desktop-titlebar-height: 0px;
-  --background: oklch(0.985 0.003 247.86);
-  --foreground: oklch(0.19 0.015 255);
-  --card: oklch(1 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --border: oklch(0.91 0.008 255);
-  --input: oklch(0.91 0.008 255);
-  --ring: oklch(0.708 0 0);
+  --background: #f6f6f5;
+  --foreground: #1c1c1b;
+  --card: #fbfbfa;
+  --muted: #efefed;
+  --muted-foreground: #6b6b67;
+  --border: #dededb;
+  --input: #dededb;
+  --ring: #2563d9;
   --success: #16833e;
   --destructive: #bd3c42;
   --radius: 9px;
@@ -436,14 +436,14 @@ h2 {
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
-    --background: oklch(0.16 0.012 255);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.19 0.012 255);
-    --muted: oklch(0.245 0.012 255);
-    --muted-foreground: oklch(0.708 0 0);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
+    --background: #101010;
+    --foreground: #f2f2ef;
+    --card: #171717;
+    --muted: #242424;
+    --muted-foreground: #a3a39d;
+    --border: #303030;
+    --input: #444444;
+    --ring: #6da6f7;
     --success: #45bd70;
     --destructive: oklch(0.704 0.191 22.216);
   }

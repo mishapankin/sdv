@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="en" data-palette="graphite" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SDV Palette Study</title>
+    <style>
+      * { box-sizing: border-box; }
+
+      :root {
+        color-scheme: dark;
+        --sans: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
+        --mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+        --radius: 8px;
+      }
+
+      html[data-theme="light"] { color-scheme: light; }
+      html[data-theme="dark"] { color-scheme: dark; }
+
+      html[data-palette="graphite"][data-theme="light"] {
+        --canvas: #f6f6f5; --panel: #fbfbfa; --raised: #ffffff;
+        --muted: #efefed; --code: #fbfbfa; --border: #dededb;
+        --border-strong: #c8c8c3; --text: #1c1c1b; --text-2: #6b6b67;
+        --accent: #2563d9; --accent-soft: #2563d916; --accent-line: #2563d9;
+        --shadow: #24242018;
+      }
+      html[data-palette="graphite"][data-theme="dark"] {
+        --canvas: #101010; --panel: #171717; --raised: #1d1d1d;
+        --muted: #242424; --code: #131313; --border: #303030;
+        --border-strong: #444444; --text: #f2f2ef; --text-2: #a3a39d;
+        --accent: #6da6f7; --accent-soft: #6da6f719; --accent-line: #6da6f7;
+        --shadow: #00000055;
+      }
+
+      html[data-palette="monochrome"][data-theme="light"] {
+        --canvas: #f4f4f4; --panel: #fafafa; --raised: #ffffff;
+        --muted: #ececec; --code: #ffffff; --border: #d7d7d7;
+        --border-strong: #bdbdbd; --text: #161616; --text-2: #696969;
+        --accent: #171717; --accent-soft: #17171712; --accent-line: #171717;
+        --shadow: #00000015;
+      }
+      html[data-palette="monochrome"][data-theme="dark"] {
+        --canvas: #0e0e0e; --panel: #161616; --raised: #202020;
+        --muted: #292929; --code: #101010; --border: #303030;
+        --border-strong: #484848; --text: #f1f1f1; --text-2: #9c9c9c;
+        --accent: #f0f0f0; --accent-soft: #ffffff12; --accent-line: #d5d5d5;
+        --shadow: #00000060;
+      }
+
+      html[data-palette="steel"][data-theme="light"] {
+        --canvas: #f4f7fa; --panel: #f9fbfd; --raised: #ffffff;
+        --muted: #eaf0f5; --code: #f7f9fc; --border: #d7e0e8;
+        --border-strong: #bccbd8; --text: #182330; --text-2: #657484;
+        --accent: #1677d2; --accent-soft: #1677d218; --accent-line: #258be5;
+        --shadow: #10263b1a;
+      }
+      html[data-palette="steel"][data-theme="dark"] {
+        --canvas: #0d1218; --panel: #131a22; --raised: #1a232d;
+        --muted: #202b36; --code: #10161d; --border: #2b3744;
+        --border-strong: #3a4b5d; --text: #edf4fb; --text-2: #93a4b6;
+        --accent: #69b1ff; --accent-soft: #69b1ff1b; --accent-line: #69b1ff;
+        --shadow: #02070d75;
+      }
+
+      html[data-palette="warm"][data-theme="light"] {
+        --canvas: #f7f5f1; --panel: #fcfaf7; --raised: #fffdf9;
+        --muted: #efebe4; --code: #fbfaf7; --border: #ded8cf;
+        --border-strong: #c9bfb3; --text: #28231e; --text-2: #756b61;
+        --accent: #a8542d; --accent-soft: #a8542d16; --accent-line: #b75e35;
+        --shadow: #3b2b1d1a;
+      }
+      html[data-palette="warm"][data-theme="dark"] {
+        --canvas: #15130f; --panel: #1b1814; --raised: #24201a;
+        --muted: #29251e; --code: #17140f; --border: #393229;
+        --border-strong: #50463a; --text: #f4eee5; --text-2: #ad9f90;
+        --accent: #e39a6b; --accent-soft: #e39a6b18; --accent-line: #e39a6b;
+        --shadow: #05030270;
+      }
+
+      body {
+        margin: 0;
+        min-width: 1080px;
+        min-height: 100vh;
+        overflow: hidden;
+        background: var(--canvas);
+        color: var(--text);
+        font-family: var(--sans);
+        transition: background-color 180ms ease, color 180ms ease;
+      }
+
+      button { color: inherit; font: inherit; }
+      svg { display: block; }
+
+      .study-bar {
+        height: 72px;
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        padding: 0 24px;
+        border-bottom: 1px solid var(--border);
+        background: var(--raised);
+      }
+      .study-title { min-width: 230px; }
+      .study-title strong { display: block; font-size: 14px; letter-spacing: -.01em; }
+      .study-title span { color: var(--text-2); font: 10px var(--mono); }
+      .palette-tabs { display: flex; gap: 5px; padding: 4px; border-radius: 10px; background: var(--muted); }
+      .palette-tab, .theme-button {
+        height: 34px;
+        border: 0;
+        border-radius: 7px;
+        padding: 0 13px;
+        cursor: pointer;
+        background: transparent;
+        color: var(--text-2);
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .palette-tab:hover, .theme-button:hover { color: var(--text); }
+      .palette-tab.active {
+        background: var(--raised);
+        color: var(--text);
+        box-shadow: 0 1px 3px var(--shadow);
+      }
+      .theme-button {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        border: 1px solid var(--border);
+        background: var(--panel);
+      }
+      .theme-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--text); box-shadow: inset -4px -3px 0 var(--raised); }
+
+      .palette-note {
+        height: 48px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 0 24px;
+        border-bottom: 1px solid var(--border);
+        background: var(--canvas);
+      }
+      .palette-note strong { min-width: 126px; font-size: 12px; }
+      .palette-note p { flex: 1; margin: 0; color: var(--text-2); font-size: 11px; }
+      .swatches { display: flex; gap: 5px; }
+      .swatch { width: 24px; height: 14px; border: 1px solid var(--border-strong); border-radius: 3px; }
+      .swatch:nth-child(1) { background: var(--canvas); }
+      .swatch:nth-child(2) { background: var(--panel); }
+      .swatch:nth-child(3) { background: var(--raised); }
+      .swatch:nth-child(4) { background: var(--muted); }
+      .swatch:nth-child(5) { background: var(--code); }
+      .swatch:nth-child(6) { background: var(--accent); }
+
+      .app-shell {
+        height: calc(100vh - 120px);
+        min-height: 600px;
+        display: grid;
+        grid-template-rows: 53px 1fr;
+      }
+      .toolbar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0 14px;
+        border-bottom: 1px solid var(--border);
+        background: var(--panel);
+      }
+      .repo-name { font-size: 11px; font-weight: 700; }
+      .branch { color: var(--text-2); font: 10px var(--mono); }
+      .divider { color: var(--border-strong); }
+      .control {
+        height: 29px;
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 0 10px;
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        background: var(--raised);
+        font-size: 11px;
+        box-shadow: 0 1px 2px var(--shadow);
+      }
+      .toolbar-spacer { flex: 1; }
+      .icon-button {
+        width: 31px; height: 31px; display: grid; place-items: center;
+        border: 0; border-radius: 7px; background: transparent; color: var(--text-2);
+      }
+      .icon-button.active { color: var(--text); background: var(--muted); }
+      .auto { display: flex; align-items: center; gap: 7px; color: var(--text-2); font-size: 11px; }
+      .switch { width: 28px; height: 16px; padding: 2px; border-radius: 99px; background: var(--accent); }
+      .switch::after { content: ""; display: block; width: 12px; height: 12px; margin-left: 12px; border-radius: 50%; background: var(--raised); box-shadow: 0 1px 2px var(--shadow); }
+
+      .workspace { min-height: 0; display: grid; grid-template-columns: 244px 1fr 254px; }
+      .sidebar { min-width: 0; background: var(--panel); border-right: 1px solid var(--border); }
+      .sidebar.right { border-right: 0; border-left: 1px solid var(--border); }
+      .side-head {
+        height: 46px; display: flex; align-items: center; justify-content: space-between;
+        padding: 0 13px; border-bottom: 1px solid var(--border); color: var(--text-2);
+        font-size: 9px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
+      }
+      .count { padding: 3px 6px; border-radius: 5px; background: var(--muted); color: var(--text); font: 9px var(--mono); }
+      .section-label { padding: 13px 12px 7px; color: var(--text-2); font: 9px var(--mono); text-transform: uppercase; }
+      .file-row, .entity-row {
+        position: relative; display: grid; align-items: center; gap: 8px;
+        margin: 1px 7px; padding: 0 9px; border-radius: 6px; color: var(--text-2);
+      }
+      .file-row { grid-template-columns: 16px 1fr auto; height: 34px; font-size: 11px; }
+      .file-row.selected, .entity-row.selected { background: var(--accent-soft); color: var(--text); }
+      .file-row.selected::before, .entity-row.selected::before {
+        content: ""; position: absolute; left: 0; top: 6px; bottom: 6px; width: 2px;
+        border-radius: 2px; background: var(--accent-line);
+      }
+      .file-icon { width: 14px; height: 16px; display: grid; place-items: center; border-radius: 2px; background: #3178c6; color: white; font: 8px var(--mono); }
+      .change { font: 700 10px var(--mono); }
+      .green { color: #35b878; } .red { color: #ec5c64; } .amber { color: #d69b39; } .violet { color: #a68af5; }
+
+      .entity-row { grid-template-columns: 16px 1fr 18px; min-height: 42px; padding-top: 5px; padding-bottom: 5px; }
+      .entity-icon { color: var(--text-2); font: 13px var(--mono); }
+      .entity-row.selected .entity-icon { color: var(--accent); }
+      .entity-title { display: block; overflow: hidden; color: inherit; font-size: 11px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+      .entity-meta { display: block; margin-top: 2px; overflow: hidden; color: var(--text-2); font: 8px var(--mono); text-overflow: ellipsis; white-space: nowrap; }
+
+      .main { min-width: 0; display: grid; grid-template-rows: 72px 1fr; background: var(--canvas); }
+      .file-head {
+        display: flex; align-items: center; gap: 12px; padding: 0 22px;
+        border-bottom: 1px solid var(--border); background: var(--panel);
+      }
+      .file-head-icon { color: var(--accent); font: 18px var(--mono); }
+      .file-head h1 { margin: 0; font-size: 16px; letter-spacing: -.02em; }
+      .file-head p { margin: 4px 0 0; color: var(--text-2); font: 9px var(--mono); }
+      .diff-wrap { min-height: 0; padding: 17px; overflow: hidden; }
+      .diff {
+        height: 100%; overflow: hidden; border: 1px solid var(--border); border-radius: 8px;
+        background: var(--code); box-shadow: 0 2px 8px var(--shadow); font: 10px/20px var(--mono);
+      }
+      .diff-section { height: 30px; padding: 5px 12px; color: var(--text-2); background: color-mix(in srgb, var(--code) 82%, var(--muted)); border-bottom: 1px solid var(--border); }
+      .diff-row { display: grid; grid-template-columns: 38px 38px 1fr; min-width: 620px; }
+      .diff-row > span { padding: 0 8px; white-space: pre; }
+      .line-no { text-align: right; color: var(--text-2); border-right: 1px solid color-mix(in srgb, var(--border) 60%, transparent); user-select: none; }
+      .diff-row.add { background: color-mix(in srgb, var(--code) 88%, #19ad69); }
+      .diff-row.del { background: color-mix(in srgb, var(--code) 88%, #e64650); }
+      .diff-row.add .line-no:first-child { box-shadow: inset 3px 0 #2eb875; }
+      .diff-row.del .line-no:first-child { box-shadow: inset 3px 0 #e8545d; }
+      .kw { color: #bd76e5; } .fn { color: #4f9ee8; } .str { color: #4eaa98; } .comment { color: var(--text-2); }
+
+      .floating-menus { position: absolute; top: 143px; right: 274px; z-index: 3; display: flex; align-items: flex-start; gap: 10px; pointer-events: none; }
+      .menu {
+        width: 225px; overflow: hidden; border: 1px solid var(--border-strong); border-radius: 9px;
+        background: var(--raised); box-shadow: 0 12px 32px var(--shadow), 0 2px 6px var(--shadow);
+      }
+      .menu.wide { width: 310px; }
+      .menu-head { padding: 11px 12px 9px; border-bottom: 1px solid var(--border); }
+      .menu-head strong { display: block; font-size: 11px; }
+      .menu-head span { display: block; margin-top: 3px; color: var(--text-2); font-size: 9px; }
+      .menu-search { height: 34px; display: flex; align-items: center; gap: 8px; padding: 0 11px; border-bottom: 1px solid var(--border); color: var(--text-2); font-size: 10px; }
+      .menu-body { padding: 6px; }
+      .menu-row { display: flex; align-items: center; gap: 8px; min-height: 34px; padding: 6px 7px; border-radius: 6px; font-size: 10px; }
+      .menu-row.active { background: var(--muted); }
+      .menu-row .small { display: block; margin-top: 2px; color: var(--text-2); font: 8px var(--mono); }
+      .option-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; margin-top: 8px; padding: 3px; border-radius: 7px; background: var(--muted); }
+      .option { padding: 7px; border-radius: 5px; color: var(--text-2); text-align: center; font-size: 9px; }
+      .option.active { background: var(--raised); color: var(--text); box-shadow: 0 1px 2px var(--shadow); }
+      .check { width: 12px; height: 12px; display: grid; place-items: center; border: 1px solid var(--border-strong); border-radius: 3px; color: var(--raised); font-size: 8px; }
+      .check.on { border-color: var(--accent); background: var(--accent); }
+
+      @media (max-height: 760px) {
+        .study-bar { height: 62px; }
+        .palette-note { height: 42px; }
+        .app-shell { height: calc(100vh - 104px); }
+        .floating-menus { top: 126px; }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="study-bar">
+      <div class="study-title">
+        <strong>SDV palette study</strong>
+        <span>surface hierarchy · diff context · semantic color</span>
+      </div>
+      <nav class="palette-tabs" aria-label="Choose palette">
+        <button class="palette-tab active" data-palette="graphite">Neutral graphite</button>
+        <button class="palette-tab" data-palette="monochrome">Strict monochrome</button>
+        <button class="palette-tab" data-palette="steel">Cool steel</button>
+        <button class="palette-tab" data-palette="warm">Warm graphite</button>
+      </nav>
+      <button class="theme-button" id="theme-toggle" aria-label="Toggle light and dark theme">
+        <span class="theme-dot"></span><span id="theme-label">Dark</span>
+      </button>
+    </header>
+
+    <div class="palette-note">
+      <strong id="palette-name">Neutral graphite</strong>
+      <p id="palette-description">Neutral surfaces with a restrained blue selection accent. Recommended for SDV.</p>
+      <div class="swatches" aria-label="Current palette swatches">
+        <span class="swatch"></span><span class="swatch"></span><span class="swatch"></span>
+        <span class="swatch"></span><span class="swatch"></span><span class="swatch"></span>
+      </div>
+    </div>
+
+    <section class="app-shell" aria-label="SDV interface mockup">
+      <header class="toolbar">
+        <span class="repo-name">sdv</span><span class="divider">/</span><span class="branch">⌘ main</span>
+        <button class="control">Changed <span>⌄</span></button>
+        <div class="toolbar-spacer"></div>
+        <button class="icon-button active" title="View options">☷</button>
+        <button class="icon-button" title="Panels">▥</button>
+        <span class="auto">Auto <span class="switch"></span></span>
+        <button class="icon-button" title="Refresh">↻</button>
+        <button class="icon-button" title="Settings">⚙</button>
+      </header>
+
+      <div class="workspace">
+        <aside class="sidebar">
+          <div class="side-head"><span>Changed files</span><span class="count">7</span></div>
+          <div class="section-label">src / components</div>
+          <div class="file-row selected"><span class="file-icon">TS</span><span>semantic-diff-viewer.tsx</span><span class="change amber">M</span></div>
+          <div class="file-row"><span class="file-icon">TS</span><span>comparison-controls.tsx</span><span class="change green">A</span></div>
+          <div class="file-row"><span class="file-icon">TS</span><span>entity-panel.tsx</span><span class="change amber">M</span></div>
+          <div class="file-row"><span class="file-icon">TS</span><span>old-sidebar.tsx</span><span class="change red">D</span></div>
+          <div class="section-label">src / app</div>
+          <div class="file-row"><span class="file-icon">#</span><span>globals.css</span><span class="change violet">R</span></div>
+          <div class="file-row"><span class="file-icon">TS</span><span>page.tsx</span><span class="change amber">M</span></div>
+        </aside>
+
+        <main class="main">
+          <header class="file-head">
+            <span class="file-head-icon">◇</span>
+            <div><h1>SemanticDiffViewer</h1><p>src/components/semantic-diff-viewer.tsx · component</p></div>
+          </header>
+          <div class="diff-wrap">
+            <div class="diff">
+              <div class="diff-section">@@ -338,12 +338,14 @@ export function SemanticDiffViewer()</div>
+              <div class="diff-row"><span class="line-no">338</span><span class="line-no">338</span><span>  <span class="kw">return</span> (</span></div>
+              <div class="diff-row"><span class="line-no">339</span><span class="line-no">339</span><span>    &lt;<span class="fn">WorkerPoolContextProvider</span></span></div>
+              <div class="diff-row del"><span class="line-no">340</span><span class="line-no"></span><span>-     highlighterOptions={options}</span></div>
+              <div class="diff-row add"><span class="line-no"></span><span class="line-no">340</span><span>+     highlighterOptions={DIFF_HIGHLIGHTER_OPTIONS}</span></div>
+              <div class="diff-row"><span class="line-no">341</span><span class="line-no">341</span><span>    &gt;</span></div>
+              <div class="diff-row"><span class="line-no">342</span><span class="line-no">342</span><span>      &lt;<span class="fn">TooltipProvider</span>&gt;</span></div>
+              <div class="diff-row del"><span class="line-no">343</span><span class="line-no"></span><span>-       &lt;div className=<span class="str">"bg-slate-950"</span>&gt;</span></div>
+              <div class="diff-row add"><span class="line-no"></span><span class="line-no">343</span><span>+       &lt;div className=<span class="str">"bg-background"</span>&gt;</span></div>
+              <div class="diff-row add"><span class="line-no"></span><span class="line-no">344</span><span>+         <span class="comment">{/* surfaces inherit the active palette */}</span></span></div>
+              <div class="diff-row"><span class="line-no">344</span><span class="line-no">345</span><span>          &lt;<span class="fn">header</span> className=<span class="str">"border-b bg-card"</span>&gt;</span></div>
+              <div class="diff-row"><span class="line-no">345</span><span class="line-no">346</span><span>            {diff ? (</span></div>
+              <div class="diff-row"><span class="line-no">346</span><span class="line-no">347</span><span>              &lt;<span class="fn">RepositoryContext</span> diff={diff} /&gt;</span></div>
+              <div class="diff-row"><span class="line-no">347</span><span class="line-no">348</span><span>            ) : <span class="kw">null</span>}</span></div>
+            </div>
+          </div>
+        </main>
+
+        <aside class="sidebar right">
+          <div class="side-head"><span>Semantic entities</span><span class="count">4</span></div>
+          <div class="entity-row"><span class="entity-icon">◇</span><span><span class="entity-title">Full file diff</span><span class="entity-meta">complete source comparison</span></span><span></span></div>
+          <div class="entity-row selected"><span class="entity-icon">ƒ</span><span><span class="entity-title">SemanticDiffViewer</span><span class="entity-meta">component · L48</span></span><span class="change amber">M</span></div>
+          <div class="entity-row"><span class="entity-icon">◫</span><span><span class="entity-title">DIFF_WORKER_POOL_OPTIONS</span><span class="entity-meta">constant · L54</span></span><span class="change green">A</span></div>
+          <div class="entity-row"><span class="entity-icon">ƒ</span><span><span class="entity-title">toggleModuleMerge</span><span class="entity-meta">function · L333</span></span><span class="change violet">R</span></div>
+          <div class="entity-row"><span class="entity-icon">◇</span><span><span class="entity-title">LegacyDiffHeader</span><span class="entity-meta">component · removed</span></span><span class="change red">D</span></div>
+        </aside>
+      </div>
+    </section>
+
+    <div class="floating-menus" aria-label="Menu surface examples">
+      <div class="menu wide">
+        <div class="menu-search">⌕ &nbsp;Search hash, message, branch, author…</div>
+        <div class="menu-body">
+          <div class="menu-row active"><span>⑂</span><span><b>main</b><span class="small">7a4ec21 · Align visual tokens · 2h ago</span></span></div>
+          <div class="menu-row"><span>◇</span><span><b>HEAD~1</b><span class="small">3d9c2ab · Improve commit selector · 1d ago</span></span></div>
+          <div class="menu-row"><span>◇</span><span><b>v0.1.0</b><span class="small">b5cf192 · Initial release · 4d ago</span></span></div>
+        </div>
+      </div>
+      <div class="menu">
+        <div class="menu-head"><strong>View options</strong><span>Adjust code and semantic changes.</span></div>
+        <div class="menu-body">
+          <span class="small">DIFF LAYOUT</span>
+          <div class="option-grid"><div class="option active">▥ Side-by-side</div><div class="option">☷ Inline</div></div>
+          <div class="menu-row"><span class="check on">✓</span><span><b>Wrap long lines</b><span class="small">Fit lines within the diff pane.</span></span></div>
+          <div class="menu-row"><span class="check"></span><span><b>Combine module changes</b><span class="small">Merge matching additions.</span></span></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const descriptions = {
+        graphite: ["Neutral graphite", "Neutral surfaces with a restrained blue selection accent. Recommended for SDV."],
+        monochrome: ["Strict monochrome", "The quietest option: hierarchy comes from lightness; color is reserved for Git meaning."],
+        steel: ["Cool steel", "A consistent version of the current blue-gray direction, including menus and the editor."],
+        warm: ["Warm graphite", "A softer brown-neutral workspace with a copper selection accent and low visual fatigue."],
+      };
+
+      document.querySelectorAll(".palette-tab").forEach((button) => {
+        button.addEventListener("click", () => {
+          const palette = button.dataset.palette;
+          document.documentElement.dataset.palette = palette;
+          document.querySelectorAll(".palette-tab").forEach((item) => item.classList.toggle("active", item === button));
+          document.getElementById("palette-name").textContent = descriptions[palette][0];
+          document.getElementById("palette-description").textContent = descriptions[palette][1];
+        });
+      });
+
+      document.getElementById("theme-toggle").addEventListener("click", () => {
+        const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+        document.documentElement.dataset.theme = next;
+        document.getElementById("theme-label").textContent = next[0].toUpperCase() + next.slice(1);
+      });
+    </script>
+  </body>
+</html>

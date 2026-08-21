@@ -51,7 +51,7 @@ export function ErrorState({
           </div>
           <div className="min-w-0 flex-1">
             <h2 className="font-semibold">{title}</h2>
-            <pre className="mt-2 overflow-auto whitespace-pre-wrap rounded-md bg-slate-950 p-3 font-mono text-xs leading-5 text-slate-200">
+            <pre className="mt-2 overflow-auto whitespace-pre-wrap rounded-md bg-neutral-950 p-3 font-mono text-xs leading-5 text-neutral-200">
               {error}
             </pre>
             <Button

@@ -33,7 +33,7 @@ export function SemanticUnavailablePanel() {
             href="https://github.com/ataraxy-labs/sem"
             target="_blank"
             rel="noreferrer"
-            className="font-mono text-sky-700 underline decoration-sky-700/30 underline-offset-2 hover:decoration-sky-700 dark:text-sky-300 dark:decoration-sky-300/30 dark:hover:decoration-sky-300"
+            className="font-mono text-primary underline decoration-primary/30 underline-offset-2 hover:decoration-primary"
           >
             sem
           </a>{" "}
@@ -61,7 +61,7 @@ export function EntityPanel({
   const reviewsByEntityId = indexInspectReviews(inspectReviews);
   const isFullFileSelected = selectedEntityId === undefined;
   const selectedRowClass =
-    "bg-sky-500/10 text-foreground shadow-xs ring-1 ring-inset ring-sky-600/20 before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:rounded-full before:bg-sky-600 dark:bg-sky-400/10 dark:ring-sky-400/25 dark:before:bg-sky-400";
+    "bg-primary/10 text-foreground shadow-xs ring-1 ring-inset ring-primary/20 before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:rounded-full before:bg-primary";
 
   return (
     <aside className="flex h-full min-w-0 flex-col bg-sidebar/60">
@@ -94,8 +94,7 @@ export function EntityPanel({
             <FileCode2
               className={cn(
                 "size-4 shrink-0 text-muted-foreground",
-                isFullFileSelected &&
-                  "text-sky-700 dark:text-sky-300",
+                isFullFileSelected && "text-primary",
               )}
             />
             <span className="min-w-0 flex-1 truncate text-xs font-medium">
@@ -125,8 +124,7 @@ export function EntityPanel({
                   entityType={change.entityType}
                   className={cn(
                     "size-4 shrink-0 text-muted-foreground",
-                    selectedEntityId === change.entityId &&
-                      "text-sky-700 dark:text-sky-300",
+                    selectedEntityId === change.entityId && "text-primary",
                   )}
                 />
                 <span className="min-w-0 overflow-hidden">

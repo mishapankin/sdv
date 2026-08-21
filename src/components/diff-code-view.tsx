@@ -58,7 +58,7 @@ export function DiffCodeView({
         ref={codeViewRef}
         containerRef={containerRef}
         items={items}
-        className="diff-view-scrollbar min-h-0 shrink overflow-y-auto rounded-lg border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
+        className="sdv-diff-theme diff-view-scrollbar min-h-0 shrink overflow-y-auto rounded-lg border bg-code-background shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
         options={{
           diffStyle: diffLayout,
           diffIndicators: "bars",
